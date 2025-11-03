@@ -1,4 +1,8 @@
 use core::fmt;
+use std::{
+    fs::File,
+    io::{BufReader, ErrorKind, Read, Result},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Category {
@@ -46,15 +50,17 @@ pub enum Category {
     Invalid,
 }
 
+pub type Position = (u32, u32);
+
 #[derive(Clone)]
 pub struct Token {
     category: Category,
     data: String,
-    position: (u8, u8), // line, col
+    position: Position, // line, col
 }
 
 impl Token {
-    pub fn new(category: Category, data: Option<String>, line: u8, col: u8) -> Self {
+    pub fn new(category: Category, data: Option<String>, line: u32, col: u32) -> Self {
         match data {
             Some(s) => Self {
                 category,
@@ -77,5 +83,44 @@ impl fmt::Display for Token {
         } else {
             write!(f, "{:?}({})", self.category, self.data)
         }
+    }
+}
+
+struct Reader {
+    input: BufReader<File>,
+    buf: [u8; 2],
+    pub line: u32,
+    pub col: u32,
+}
+
+impl Reader {
+    pub fn from_file(f: File) -> Result<Self> {
+        let mut input = BufReader::new(f);
+        let mut buf = [0, 0]; // TODO: rework eventually for slight memory efficiency gains; two `u8`s are unnecessary here
+        input.read_exact(&mut buf[1..])?;
+        Ok(Self {
+            input,
+            buf,
+            line: 1,
+            col: 1,
+        })
+    }
+
+    pub fn next(&mut self) -> Result<char> {
+        self.buf[0] = self.buf[1];
+        match self.input.read_exact(&mut self.buf[1..]) {
+            Ok(()) => (),
+            Err(err) if err.kind() == ErrorKind::UnexpectedEof => self.buf[1] = 0, // end of file
+            Err(err) => return Err(err),
+        }
+        Ok(self.buf[0] as char)
+    }
+
+    pub fn peek(&self) -> char {
+        self.buf[1] as char
+    }
+
+    pub fn hasNext(&self) -> bool {
+        self.buf[1] == 0
     }
 }
