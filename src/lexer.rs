@@ -24,13 +24,27 @@ impl Tokeniser {
     }
 
     pub fn next_token(&mut self) -> Result<Token> {
+        use Category::*;
         let line = self.reader.line;
         let col = self.reader.col;
         if self.reader.has_next() {
             let c = self.reader.next()?;
 
             let tok = match c {
-                '+' => Token::new(Category::Plus, None, line, col),
+                '{' => Token::blank(LBrace, line, col),
+                '}' => Token::blank(RBrace, line, col),
+                '(' => Token::blank(LPar, line, col),
+                ')' => Token::blank(RPar, line, col),
+                '[' => Token::blank(LBrack, line, col),
+                ']' => Token::blank(RBrack, line, col),
+                ';' => Token::blank(Semi, line, col),
+                ',' => Token::blank(Comma, line, col),
+                '+' => Token::blank(Plus, line, col),
+                '-' => Token::blank(Minus, line, col),
+                '%' => Token::blank(Rem, line, col),
+                '*' => Token::blank(Asterisk, line, col),
+                '.' => Token::blank(Dot, line, col),
+                _ if c.is_ascii_whitespace() => self.next_token()?,
                 _ => self.invalid(c, line, col)?,
             };
             Ok(tok)
@@ -107,6 +121,10 @@ impl Token {
                 position: (line, col),
             },
         }
+    }
+
+    pub fn blank(category: Category, line: u32, col: u32) -> Self {
+        Self::new(category, None, line, col)
     }
 
     pub fn category(&self) -> Category {

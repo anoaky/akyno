@@ -9,7 +9,7 @@ pub fn main() -> Result<()> {
     if args[1] == "-lexer" {
         let mut t = tokeniser.next_token()?;
         while t.category() != Category::Eof {
-            print!("{}", t);
+            println!("{}", t);
             t = tokeniser.next_token()?;
         }
     }
