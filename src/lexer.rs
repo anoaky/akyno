@@ -78,6 +78,41 @@ impl Tokeniser {
         }
     }
 
+    fn try_process_escape(&mut self) -> Result<Option<char>> {
+        let c = self.reader.next()?;
+        Ok(match c {
+            '0' | 'a' | 'b' | 't' | 'n' | 'r' | '\'' | '"' | '\\' => Some(c),
+            _ => None,
+        })
+    }
+
+    fn try_read_string(&mut self, mut data: String) -> Result<Token> {
+        let c = self.reader.next()?;
+        if c == '"' {
+            Ok(Token::new(
+                Category::StrLiteral,
+                Some(data),
+                self.reader.line,
+                self.reader.col,
+            ))
+        } else {
+            match c {
+                '\\' => match self.try_process_escape()? {
+                    Some(c) => {
+                        data.push(c);
+                        self.try_read_string(data)
+                    }
+                    None => self.invalid(c, self.reader.line, self.reader.col),
+                },
+                _ if c.is_ascii_alphanumeric() || is_special(c) || c == '\'' || c == ' ' => {
+                    data.push(c);
+                    self.try_read_string(data)
+                }
+                _ => self.invalid(c, self.reader.line, self.reader.col),
+            }
+        }
+    }
+
     pub fn next_token(&mut self) -> Result<Token> {
         use Category::*;
         let line = self.reader.line;
@@ -86,6 +121,7 @@ impl Tokeniser {
             let c = self.reader.next()?;
 
             let tok = match c {
+                '"' => self.try_read_string("".to_owned())?,
                 '{' => Token::blank(LBrace, line, col),
                 '}' => Token::blank(RBrace, line, col),
                 '(' => Token::blank(LPar, line, col),
@@ -180,6 +216,40 @@ fn is_valid_ident_start(c: char) -> bool {
 
 fn is_valid_ident(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
+}
+
+fn is_special(c: char) -> bool {
+    matches!(
+        c,
+        '`' | '~'
+            | '@'
+            | '!'
+            | '$'
+            | '#'
+            | '^'
+            | '*'
+            | '%'
+            | '&'
+            | '('
+            | ')'
+            | '['
+            | ']'
+            | '{'
+            | '}'
+            | '<'
+            | '>'
+            | '+'
+            | '='
+            | '_'
+            | '-'
+            | '|'
+            | '/'
+            | ';'
+            | ':'
+            | ','
+            | '.'
+            | '?'
+    )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
