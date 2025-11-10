@@ -1,10 +1,10 @@
-use std::io::Result;
+use std::{io::Result, path::Path};
 
 use toyc::lexer::{Category, Token, Tokeniser};
 
 pub fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    let mut tokeniser = Tokeniser::from_path(&args[2])?;
+    let mut tokeniser = Tokeniser::from_path(Path::new(&args[2]))?;
 
     if args[1] == "-lexer" {
         let mut t = tokeniser.next_token()?;

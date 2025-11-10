@@ -3,4 +3,10 @@ name = "toyc"
 version = "0.1.0"
 edition = "2024"
 
+[[example]]
+name = "tests"
+
 [dependencies]
+
+[dev-dependencies]
+xmlwriter = "0.1.0"

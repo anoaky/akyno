@@ -2,6 +2,7 @@ use core::fmt;
 use std::{
     fs::File,
     io::{BufReader, ErrorKind, Read, Result},
+    path::Path,
 };
 
 use crate::util::CompilerPass;
@@ -22,7 +23,7 @@ impl CompilerPass for Tokeniser {
 }
 
 impl Tokeniser {
-    pub fn from_path(fp: &str) -> Result<Self> {
+    pub fn from_path(fp: &Path) -> Result<Self> {
         let f = File::open(fp)?;
         let reader = Reader::from_file(f)?;
         Ok(Self { errors: 0, reader })
