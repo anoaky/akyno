@@ -10,5 +10,6 @@ name = "tests"
 downcast-rs = "2.0.2"
 
 [dev-dependencies]
-insta = {version = "1.46.0", features = ["yaml"]}
+insta = {version = "1.46.0", features = ["yaml", "glob"]}
+rstest = "0.26.1"
 xmlwriter = "0.1.0"
