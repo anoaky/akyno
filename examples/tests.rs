@@ -29,7 +29,7 @@ pub fn main() -> Result<()> {
     w.start_element("tests");
     for tc in test_cases {
         println!("Found test case: {}", tc.name);
-        if tc.expected_exit_code == LEXER_FAIL {
+        if tc.lexer_exit_code == LEXER_FAIL {
             lexer_total += 1;
             if tc.test_lexer(&mut w)? == LEXER_FAIL {
                 lexer_passed += 1;
@@ -63,7 +63,7 @@ fn write_overview(w: &mut XmlWriter, component: &str, passed: u32, total: u32) {
 struct TestCase {
     pub name: String,
     pub path: PathBuf,
-    pub expected_exit_code: u32,
+    pub lexer_exit_code: u32,
 }
 
 impl TestCase {
@@ -77,24 +77,32 @@ impl TestCase {
         let mut reader = BufReader::new(File::open(fp)?);
         let mut line = String::new();
         reader.read_line(&mut line)?;
-        let expected_exit_code = if line == "/*" {
+        let expected_exit_code = if line.starts_with("/*") {
             // extract exit code
+            line.clear();
             reader.read_line(&mut line)?;
-            line.parse::<u32>().unwrap_or(0)
+            line.trim().parse::<u32>().unwrap_or(1)
+        } else if line.starts_with("//") {
+            line.split_off(2).trim().parse::<u32>().unwrap_or(1)
+        } else {
+            0
+        };
+        let lexer_exit_code = if expected_exit_code == LEXER_FAIL {
+            LEXER_FAIL
         } else {
             0
         };
         Ok(Self {
             name,
             path,
-            expected_exit_code,
+            lexer_exit_code,
         })
     }
 
     pub fn test_lexer(&self, w: &mut XmlWriter) -> Result<u32> {
         w.start_element("test");
         w.write_attribute("name", &self.name);
-        w.write_attribute("expected", &self.expected_exit_code.to_string());
+        w.write_attribute("expected", &self.lexer_exit_code.to_string());
         w.write_attribute("component", "lexer");
         let mut tokeniser = Tokeniser::from_path(self.path.as_path())?;
         while tokeniser.next_token()?.category() != Category::Eof {}

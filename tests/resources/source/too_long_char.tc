@@ -1,0 +1,6 @@
+// 250
+int main() {
+    char c;
+    c = 'this is too long!';
+    return 0;
+}
