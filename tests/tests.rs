@@ -9,10 +9,10 @@ use anyhow::Result;
 use insta::assert_ron_snapshot;
 use rstest::rstest;
 use toyc::{
-    ast::{format_program, program::Program},
+    ast::UnboundAst,
     lexer::{Category, Tokeniser},
     parser::Parser,
-    util::CompilerPass,
+    util::{CompilerPass, Writable},
 };
 
 const LEXER_FAIL: u32 = 250;
@@ -27,6 +27,13 @@ macro_rules! set_snapshot_suffix {
     }
 }
 
+fn format_program(prog: &UnboundAst) -> Result<String> {
+    let mut out = Vec::new();
+    prog.write(&mut out)?;
+    let s = String::from_utf8(out)?;
+    Ok(s)
+}
+
 fn test_lexer(path: &Path) -> u32 {
     let mut tokeniser = Tokeniser::from_path(path).unwrap();
     while tokeniser.next_token().unwrap().category() != Category::Eof {}
@@ -37,7 +44,7 @@ fn test_lexer(path: &Path) -> u32 {
     }
 }
 
-fn test_parser(path: &Path) -> Result<(u32, Program)> {
+fn test_parser(path: &Path) -> Result<(u32, UnboundAst)> {
     let tokeniser = Tokeniser::from_path(path).unwrap();
     let mut parser = Parser::with_tokeniser(tokeniser)?;
     let program = parser.parse()?;
@@ -46,7 +53,6 @@ fn test_parser(path: &Path) -> Result<(u32, Program)> {
     } else {
         PASS
     };
-    let ast_string = format_program(&program)?;
     Ok((exit_code, program))
 }
 

@@ -1,3 +1,7 @@
+use std::io::Write;
+
+use anyhow::Result;
+
 pub trait CompilerPass {
     fn num_errors(&self) -> u32;
     fn inc_error(&mut self);
@@ -6,18 +10,6 @@ pub trait CompilerPass {
     }
 }
 
-#[macro_export]
-macro_rules! rc {
-    ( $e:expr ) => {
-        Rc::new($e)
-    };
-}
-
-#[macro_export]
-macro_rules! rc_ref {
-    ( $e:expr ) => {{
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        Rc::new(RefCell::new($e))
-    }};
+pub trait Writable {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<()>;
 }

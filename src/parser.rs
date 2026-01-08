@@ -1,13 +1,8 @@
 use anyhow::{Ok, Result, bail};
-use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::rc::Rc;
 
-use crate::ast::decl::{Decl, StructTypeDecl, VarDecl};
-use crate::ast::program::Program;
-use crate::ast::types::EType;
+use crate::ast::{DeclKind, Type, UnboundAst};
 use crate::lexer::Category;
-use crate::rc_ref;
 use crate::{
     lexer::{Token, Tokeniser},
     util::CompilerPass,
@@ -43,7 +38,7 @@ impl Parser {
         })
     }
 
-    pub fn parse(&mut self) -> Result<Program> {
+    pub fn parse(&mut self) -> Result<UnboundAst> {
         self.parse_program()
     }
 
@@ -51,13 +46,12 @@ impl Parser {
         expected.contains(&self.token.category())
     }
 
-    fn convert_token(&self, t: Token) -> EType {
-        use EType::*;
+    fn convert_token(&self, t: Token) -> Type {
         match t.category() {
-            Category::Int => Int,
-            Category::Char => Char,
-            Category::Void => Void,
-            _ => Unknown,
+            Category::Int => Type::Int,
+            Category::Char => Type::Char,
+            Category::Void => Type::Void,
+            _ => Type::Unknown,
         }
     }
 
@@ -153,37 +147,41 @@ impl Parser {
         }
     }
 
-    fn parse_program(&mut self) -> Result<Program> {
+    fn parse_program(&mut self) -> Result<UnboundAst> {
         use Category::*;
         self.parse_includes()?;
-        let mut decls: Vec<Rc<RefCell<dyn Decl>>> = vec![];
+        let mut prog = vec![];
 
         while self.accept(vec![Struct, Int, Char, Void]) {
             if self.token.category() == Struct
                 && self.look_ahead(1)?.category() == Identifier
                 && self.look_ahead(2)?.category() == LBrace
             {
-                decls.push(rc_ref!(self.parse_struct_decl()?));
+                prog.push(self.parse_struct_decl()?);
             } else if self.is_fun()? {
                 // parse fun decl / defn
                 panic!("No functions!!");
             } else {
-                decls.push(rc_ref!(self.parse_var_decl()?));
+                prog.push(self.parse_var_decl()?);
                 self.expect(vec![Semi])?;
             }
         }
 
         self.expect(vec![Eof])?;
-        Ok(Program::new(decls))
+        Ok(UnboundAst::Program(prog))
     }
 
-    fn parse_struct_decl(&mut self) -> Result<StructTypeDecl> {
+    fn parse_struct_decl(&mut self) -> Result<UnboundAst> {
         use Category::*;
         let ty = self.parse_struct_type()?;
-        let mut decl = StructTypeDecl::new(ty);
+        let name = match &ty {
+            Type::Struct(s) => s.clone(),
+            _ => panic!("Expected struct type for struct"),
+        };
+        let mut fields: Vec<UnboundAst> = vec![];
         self.expect(vec![LBrace])?;
         loop {
-            decl.add_var_decl(self.parse_var_decl()?);
+            fields.push(self.parse_var_decl()?);
             self.expect(vec![Semi])?;
             if !self.accept(vec![Int, Char, Void, Struct]) {
                 break;
@@ -191,32 +189,34 @@ impl Parser {
         }
         self.expect(vec![RBrace])?;
         self.expect(vec![Semi])?;
-        Ok(decl)
+        let decl = DeclKind::StructTypeDecl(ty, name, fields);
+        Ok(UnboundAst::Decl(decl))
     }
 
-    fn parse_struct_type(&mut self) -> Result<EType> {
+    fn parse_struct_type(&mut self) -> Result<Type> {
         use Category::*;
         self.expect(vec![Struct])?;
         let id = self.expect(vec![Identifier])?;
-        Ok(EType::Struct(RefCell::new(0), id.data))
+        let ty = Type::Struct(id.data.clone());
+        Ok(ty)
     }
 
-    fn parse_types(&mut self) -> Result<EType> {
+    fn parse_types(&mut self) -> Result<Type> {
         use Category::*;
-        let mut ty: EType = if self.token.category() == Struct {
+        let mut ty = if self.token.category() == Struct {
             self.parse_struct_type()?
         } else {
             let t = self.expect(vec![Int, Char, Void])?;
             self.convert_token(t)
         };
         while self.accept(vec![Asterisk]) {
-            ty = EType::Pointer(rc_ref!(ty));
+            ty = Type::Pointer(Box::new(ty));
             self.next_token()?;
         }
         Ok(ty)
     }
 
-    fn parse_var_decl(&mut self) -> Result<VarDecl> {
+    fn parse_var_decl(&mut self) -> Result<UnboundAst> {
         use Category::*;
         let mut ty = self.parse_types()?;
         let id = self.expect(vec![Identifier])?;
@@ -230,13 +230,13 @@ impl Parser {
             }
         }
         while !lens.is_empty() {
-            ty = EType::Array(
+            ty = Type::Array(
                 lens.pop_front()
                     .expect("Failed to pop non-empty VecDeque ??"),
-                rc_ref!(ty),
+                Box::new(ty),
             );
         }
 
-        Ok(VarDecl::new(ty, id.data))
+        Ok(UnboundAst::Decl(DeclKind::VarDecl(ty, id.data)))
     }
 }

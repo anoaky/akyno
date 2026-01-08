@@ -1,0 +1,11 @@
+---
+source: tests/tests.rs
+assertion_line: 95
+expression: ast
+---
+Program([
+  Decl(StructTypeDecl(Struct("bad"), "bad", [
+    Decl(VarDecl(Int, "field")),
+    Decl(VarDecl(Int, "field")),
+  ])),
+])
