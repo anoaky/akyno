@@ -352,11 +352,11 @@ pub enum Category {
     Invalid,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Token {
     category: Category,
     data: String,
-    position: (u32, u32), // line, col
+    pub position: (u32, u32), // line, col
 }
 
 impl Token {
