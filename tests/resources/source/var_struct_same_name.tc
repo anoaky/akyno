@@ -1,0 +1,9 @@
+// 0
+struct foo {
+    int bar;
+    int baz;
+};
+
+int foo;
+char bar;
+char baz;

@@ -42,7 +42,7 @@ impl Type for BaseType {
 
 #[derive(Serialize)]
 pub struct ArrayType {
-    pub array_type: Box<dyn Type>,
+    pub ty: Box<dyn Type>,
     pub len: usize,
 }
 
@@ -51,14 +51,14 @@ impl ASTNode for ArrayType {
         "ArrayType"
     }
     fn children(&self) -> Vec<&dyn ASTNode> {
-        vec![self.array_type.as_ref()]
+        vec![self.ty.as_ref()]
     }
 }
 
 impl Type for ArrayType {
     fn equals(&self, other: Box<dyn Any>) -> bool {
         if let Ok(other) = other.downcast::<ArrayType>() {
-            self.len == other.len && self.array_type.equals(other.array_type)
+            self.len == other.len && self.ty.equals(other.ty)
         } else {
             false
         }
@@ -67,10 +67,7 @@ impl Type for ArrayType {
 
 impl ArrayType {
     pub fn new(ty: Box<dyn Type>, len: usize) -> Self {
-        Self {
-            array_type: ty,
-            len,
-        }
+        Self { ty, len }
     }
 }
 

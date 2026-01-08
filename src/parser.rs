@@ -1,7 +1,7 @@
 use anyhow::{Ok, Result, bail};
 use std::collections::VecDeque;
 
-use crate::ast::decl::{Decl, VarDecl};
+use crate::ast::decl::{Decl, StructTypeDecl, VarDecl};
 use crate::ast::program::Program;
 use crate::ast::types::{ArrayType, BaseType, PointerType, StructType, Type};
 use crate::lexer::Category;
@@ -67,9 +67,12 @@ impl Parser {
         }
         println!(
             "Parsing error: expected {:?} found {:?} at {:?}",
-            expected, self.token, self.token.position
+            expected,
+            self.token.category(),
+            self.token.position
         );
         self.inc_error();
+        self.last_error_token = Some(self.token.clone());
     }
 
     fn expect(&mut self, expected: Vec<Category>) -> Result<Token> {
@@ -124,11 +127,11 @@ impl Parser {
     }
 
     fn look_ahead(&mut self, i: usize) -> Result<Token> {
-        while self.buffer.len() <= i {
+        while self.buffer.len() < i {
             self.load_buffer()?;
         }
 
-        match self.buffer.get(i) {
+        match self.buffer.get(i - 1) {
             None => bail!("Failed look ahead"),
             Some(t) => Ok(t.clone()),
         }
@@ -153,17 +156,34 @@ impl Parser {
                 && self.look_ahead(1)?.category() == Identifier
                 && self.look_ahead(2)?.category() == LBrace
             {
-                // parse struct decl
+                decls.push(Box::new(self.parse_struct_decl()?));
             } else if self.is_fun()? {
                 // parse fun decl / defn
+                panic!("No functions!!");
             } else {
-                decls.push(Box::new(self.parse_vardecl()?));
+                decls.push(Box::new(self.parse_var_decl()?));
                 self.expect(vec![Semi])?;
             }
         }
 
         self.expect(vec![Eof])?;
         Ok(Program::new(decls))
+    }
+
+    fn parse_struct_decl(&mut self) -> Result<StructTypeDecl> {
+        let ty = self.parse_struct_type()?;
+        let mut decl = StructTypeDecl::new(Box::new(ty));
+        self.expect(vec![LBrace])?;
+        loop {
+            decl.add_var_decl(self.parse_var_decl()?);
+            self.expect(vec![Semi])?;
+            if !self.accept(vec![Int, Char, Void, Struct]) {
+                break;
+            }
+        }
+        self.expect(vec![RBrace])?;
+        self.expect(vec![Semi])?;
+        Ok(decl)
     }
 
     fn parse_struct_type(&mut self) -> Result<StructType> {
@@ -186,7 +206,7 @@ impl Parser {
         Ok(ty)
     }
 
-    fn parse_vardecl(&mut self) -> Result<VarDecl> {
+    fn parse_var_decl(&mut self) -> Result<VarDecl> {
         let mut ty = self.parse_types()?;
         let id = self.expect(vec![Identifier])?;
         let mut lens: VecDeque<usize> = VecDeque::new();

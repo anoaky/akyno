@@ -38,7 +38,7 @@ impl<'a> ASTPrinter<'a> {
         } else if let Some(st) = t.downcast_ref::<StructType>() {
             format!("struct {}", st.name)
         } else if let Some(at) = t.downcast_ref::<ArrayType>() {
-            let inner_type = self.format_type(at.array_type.as_ref());
+            let inner_type = self.format_type(at.ty.as_ref());
             let split_point = inner_type.find("[");
             match split_point {
                 None => format!("{}[{}]", inner_type, at.len),

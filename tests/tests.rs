@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Result;
 
-use insta::{assert_debug_snapshot, assert_snapshot, assert_yaml_snapshot};
+use insta::assert_ron_snapshot;
 use rstest::rstest;
 use toyc::{
     ast::{format_program, program::Program},
@@ -86,7 +86,7 @@ fn test(
         assert_eq!(parser_exit_code, parser_exit);
         if parser_exit_code == PASS {
             set_snapshot_suffix!("parser");
-            assert_yaml_snapshot!(path.file_stem().unwrap().to_str().unwrap(), ast);
+            assert_ron_snapshot!(path.file_stem().unwrap().to_str().unwrap(), ast);
         }
     }
     Ok(())
