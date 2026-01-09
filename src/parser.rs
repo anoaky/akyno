@@ -58,6 +58,14 @@ fn prefix_bp(category: Category) -> u8 {
     }
 }
 
+fn postfix_bp(category: Category) -> Option<u8> {
+    use Category::*;
+    match category {
+        LPar => Some(17),
+        _ => None,
+    }
+}
+
 impl Parser {
     pub fn with_tokeniser(mut tokeniser: Tokeniser) -> Result<Self> {
         let first_token = tokeniser.next_token()?;
@@ -248,11 +256,33 @@ impl Parser {
         };
         loop {
             if !self.accept_any(vec![
-                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge,
+                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge, LPar,
             ]) {
                 break;
             }
             let op = self.token.category();
+
+            if let Some(lbind) = postfix_bp(op) {
+                if lbind < min_bind {
+                    break;
+                }
+                self.next_token()?;
+                lhs = match op {
+                    LPar => {
+                        let mut args: Vec<ExprKind> = vec![];
+                        if !self.accept(RPar) {
+                            args.push(self.parse_expr(0)?);
+                            while self.accept(Comma) {
+                                self.next_token()?;
+                                args.push(self.parse_expr(0)?);
+                            }
+                        }
+                        self.expect(RPar)?;
+                        ExprKind::FunCallExpr(Box::new(lhs), args)
+                    }
+                    _ => lhs,
+                }
+            }
 
             if let Some((lbind, rbind)) = infix_bp(op) {
                 if lbind < min_bind {

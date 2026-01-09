@@ -34,6 +34,9 @@ Program([
           ),
         ),
         Decl(VarDecl(Int, "f", Some(Literal(Int(20))))),
+        ExprStmt(FunCallExpr(VarExpr("print_i"), [
+          VarExpr("c"),
+        ])),
       ],
     ),
   ))),

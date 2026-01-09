@@ -14,6 +14,7 @@ pub enum ExprKind {
     VarExpr(String),
     BinOp(Box<ExprKind>, OpKind, Box<ExprKind>),
     Assign(Box<ExprKind>, Box<ExprKind>),
+    FunCallExpr(Box<ExprKind>, Vec<ExprKind>),
 }
 
 #[derive(Serialize, Clone, Copy)]
@@ -75,6 +76,17 @@ impl Writable for ExprKind {
                 lhs.write(writer)?;
                 write!(writer, " = ")?;
                 rhs.write(writer)?;
+            }
+            Self::FunCallExpr(name, args) => {
+                name.write(writer)?;
+                write!(writer, "(")?;
+                let mut delim = "";
+                for arg in args {
+                    write!(writer, "{}", delim)?;
+                    delim = ", ";
+                    arg.write(writer)?;
+                }
+                write!(writer, ")")?;
             }
         };
         Ok(())
