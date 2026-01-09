@@ -195,25 +195,24 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_block(&mut self) -> Result<Ast> {
-        let mut vds = vec![];
+    fn parse_block(&mut self) -> Result<StmtKind> {
         let mut stmts = vec![];
         self.expect(Category::LBrace)?;
-        while self.accept_any(vec![
-            Category::Int,
-            Category::Char,
-            Category::Void,
-            Category::Struct,
-        ]) {
-            vds.push(self.parse_var_decl()?);
-            self.expect(Category::Semi)?;
-        }
+        // while self.accept_any(vec![
+        //     Category::Int,
+        //     Category::Char,
+        //     Category::Void,
+        //     Category::Struct,
+        // ]) {
+        //     vds.push(self.parse_var_decl()?);
+        //     self.expect(Category::Semi)?;
+        // }
         while !self.accept_any(vec![Category::RBrace, Category::Eof]) {
             stmts.push(self.parse_stmt()?);
         }
         self.expect(Category::RBrace)?;
-        let block = StmtKind::Block { decls: vds, stmts };
-        Ok(Ast::Stmt(block))
+        let block = StmtKind::Block { stmts };
+        Ok(block)
     }
 
     fn parse_expr(&mut self, min_precedence: u8) -> Result<ExprKind> {
@@ -264,7 +263,11 @@ impl Parser {
             vec![]
         };
         self.expect(Category::RPar)?;
-        Ok(Ast::Decl(DeclKind::FunDecl(return_type, id.data, params)))
+        Ok(Ast::Stmt(StmtKind::Decl(DeclKind::FunDecl(
+            return_type,
+            id.data,
+            params,
+        ))))
     }
 
     fn parse_includes(&mut self) -> Result<()> {
@@ -278,12 +281,36 @@ impl Parser {
         }
     }
 
-    fn parse_params(&mut self) -> Result<Vec<Ast>> {
+    fn parse_param_or_field(&mut self) -> Result<DeclKind> {
+        use Category::*;
+        let mut ty = self.parse_types()?;
+        let id = self.expect_any(vec![Identifier])?;
+        let mut lens: VecDeque<usize> = VecDeque::new();
+        while self.accept_any(vec![LBrack]) {
+            self.expect_any(vec![LBrack])?;
+            let i = self.expect_any(vec![IntLiteral])?;
+            self.expect_any(vec![RBrack])?;
+            if i.category() == IntLiteral {
+                lens.push_front(i.data.parse::<usize>()?);
+            }
+        }
+        while !lens.is_empty() {
+            ty = Type::Array(
+                lens.pop_front()
+                    .expect("Failed to pop non-empty VecDeque ??"),
+                Box::new(ty),
+            );
+        }
+
+        Ok(DeclKind::VarDecl(ty, id.data, None))
+    }
+
+    fn parse_params(&mut self) -> Result<Vec<DeclKind>> {
         let mut params = vec![];
-        params.push(self.parse_var_decl()?);
+        params.push(self.parse_param_or_field()?);
         while self.accept_any(vec![Category::Comma]) {
             self.next_token()?;
-            params.push(self.parse_var_decl()?);
+            params.push(self.parse_param_or_field()?);
         }
         Ok(params)
     }
@@ -291,23 +318,23 @@ impl Parser {
     fn parse_program(&mut self) -> Result<Ast> {
         use Category::*;
         self.parse_includes()?;
-        let mut prog = vec![];
+        let mut prog: Vec<Ast> = vec![];
 
         while self.accept_any(vec![Struct, Int, Char, Void]) {
             if self.token.category() == Struct
                 && self.look_ahead(1)?.category() == Identifier
                 && self.look_ahead(2)?.category() == LBrace
             {
-                prog.push(self.parse_struct_decl()?);
+                prog.push(Ast::Stmt(StmtKind::Decl(self.parse_struct_decl()?)));
             } else if self.is_fun()? {
                 let decl = {
                     let decl = self.parse_fun_decl()?;
                     if self.accept(LBrace) {
                         let block = Box::new(self.parse_block()?);
-                        Ast::Decl(DeclKind::FunDefn {
+                        Ast::Stmt(StmtKind::Decl(DeclKind::FunDefn {
                             decl: Box::new(decl),
                             block,
-                        })
+                        }))
                     } else if self.accept(Semi) {
                         self.next_token()?;
                         decl
@@ -318,7 +345,7 @@ impl Parser {
                 };
                 prog.push(decl);
             } else {
-                prog.push(self.parse_var_decl()?);
+                prog.push(Ast::Stmt(StmtKind::Decl(self.parse_var_decl()?)));
                 self.expect_any(vec![Semi])?;
             }
         }
@@ -327,26 +354,26 @@ impl Parser {
         Ok(Ast::Program(prog))
     }
 
-    fn parse_stmt(&mut self) -> Result<Ast> {
+    fn parse_stmt(&mut self) -> Result<StmtKind> {
         use Category::*;
         match self.token.category() {
             LBrace => self.parse_block(),
             While => {
                 self.next_token()?;
                 self.expect(LPar)?;
-                let e = Ast::Expr(self.parse_expr(0)?);
+                let e = self.parse_expr(0)?;
                 self.expect(RPar)?;
                 let s = self.parse_stmt()?;
                 let whl = StmtKind::While {
                     expr: Box::new(e),
                     stmt: Box::new(s),
                 };
-                Ok(Ast::Stmt(whl))
+                Ok(whl)
             }
             If => {
                 self.next_token()?;
                 self.expect(LPar)?;
-                let expr = Box::new(Ast::Expr(self.parse_expr(0)?));
+                let expr = Box::new(self.parse_expr(0)?);
                 self.expect(RPar)?;
                 let then = Box::new(self.parse_stmt()?);
                 let els = if self.accept(Else) {
@@ -356,52 +383,57 @@ impl Parser {
                     None
                 };
                 let stmt = StmtKind::If { expr, then, els };
-                Ok(Ast::Stmt(stmt))
+                Ok(stmt)
             }
             Return => {
                 self.next_token()?;
                 let rv = if !self.accept(Semi) {
-                    Some(Box::new(Ast::Expr(self.parse_expr(0)?)))
+                    Some(Box::new(self.parse_expr(0)?))
                 } else {
                     None
                 };
                 self.expect(Semi)?;
                 let ret = StmtKind::Return(rv);
-                Ok(Ast::Stmt(ret))
+                Ok(ret)
             }
             Continue => {
                 self.next_token()?;
                 self.expect(Semi)?;
-                Ok(Ast::Stmt(StmtKind::Continue))
+                Ok(StmtKind::Continue)
             }
             Break => {
                 self.next_token()?;
                 self.expect(Semi)?;
-                Ok(Ast::Stmt(StmtKind::Break))
+                Ok(StmtKind::Break)
+            }
+            Int | Char | Void | Struct => {
+                let decl = self.parse_var_decl()?;
+                self.expect(Semi)?;
+                Ok(StmtKind::Decl(decl))
             }
             _ => {
-                let expr = Box::new(Ast::Expr(self.parse_expr(0)?));
+                let expr = Box::new(self.parse_expr(0)?);
                 while self.token.category() != Semi && self.token.category() != Eof {
                     self.expect(Semi)?;
                     self.next_token()?;
                 }
                 self.expect(Semi)?;
-                Ok(Ast::Stmt(StmtKind::ExprStmt(expr)))
+                Ok(StmtKind::ExprStmt(expr))
             }
         }
     }
 
-    fn parse_struct_decl(&mut self) -> Result<Ast> {
+    fn parse_struct_decl(&mut self) -> Result<DeclKind> {
         use Category::*;
         let ty = self.parse_struct_type()?;
         let name = match &ty {
             Type::Struct(s) => s.clone(),
             _ => panic!("Expected struct type for struct"),
         };
-        let mut fields: Vec<Ast> = vec![];
+        let mut fields: Vec<DeclKind> = vec![];
         self.expect_any(vec![LBrace])?;
         loop {
-            fields.push(self.parse_var_decl()?);
+            fields.push(self.parse_param_or_field()?);
             self.expect_any(vec![Semi])?;
             if !self.accept_any(vec![Int, Char, Void, Struct]) {
                 break;
@@ -410,7 +442,7 @@ impl Parser {
         self.expect_any(vec![RBrace])?;
         self.expect_any(vec![Semi])?;
         let decl = DeclKind::StructTypeDecl(ty, name, fields);
-        Ok(Ast::Decl(decl))
+        Ok(decl)
     }
 
     fn parse_struct_type(&mut self) -> Result<Type> {
@@ -436,7 +468,7 @@ impl Parser {
         Ok(ty)
     }
 
-    fn parse_var_decl(&mut self) -> Result<Ast> {
+    fn parse_var_decl(&mut self) -> Result<DeclKind> {
         use Category::*;
         let mut ty = self.parse_types()?;
         let id = self.expect_any(vec![Identifier])?;
@@ -456,7 +488,13 @@ impl Parser {
                 Box::new(ty),
             );
         }
+        let expr = if self.accept(Assign) {
+            self.next_token()?;
+            Some(self.parse_expr(0)?)
+        } else {
+            None
+        };
 
-        Ok(Ast::Decl(DeclKind::VarDecl(ty, id.data)))
+        Ok(DeclKind::VarDecl(ty, id.data, expr))
     }
 }

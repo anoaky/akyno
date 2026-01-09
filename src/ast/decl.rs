@@ -4,24 +4,32 @@ use serde::Serialize;
 
 use super::types::Type;
 use crate::{
-    ast::Ast,
+    ast::{Ast, ExprKind, StmtKind},
     util::{Writable, Writer},
 };
 
 #[derive(Serialize, Clone)]
 pub enum DeclKind {
-    VarDecl(Type, String),
-    StructTypeDecl(Type, String, Vec<Ast>),
-    FunDecl(Type, String, Vec<Ast>),
-    FunDefn { decl: Box<Ast>, block: Box<Ast> },
+    VarDecl(Type, String, Option<ExprKind>),
+    StructTypeDecl(Type, String, Vec<DeclKind>),
+    FunDecl(Type, String, Vec<DeclKind>),
+    FunDefn {
+        decl: Box<Ast>,
+        block: Box<StmtKind>,
+    },
 }
 
 impl Writable for DeclKind {
     fn write<T: std::io::Write>(&self, writer: &mut Writer<'_, T>) -> anyhow::Result<()> {
         match self {
-            DeclKind::VarDecl(t, s) => {
+            DeclKind::VarDecl(t, s, e) => {
                 t.write(writer)?;
-                writeln!(writer, " {};", s)?;
+                write!(writer, " {}", s)?;
+                if let Some(e) = e {
+                    write!(writer, " = ")?;
+                    e.write(writer)?;
+                }
+                writeln!(writer, ";")?;
             }
             DeclKind::StructTypeDecl(_, name, fields) => {
                 writeln!(writer, "struct {} {{", name)?;

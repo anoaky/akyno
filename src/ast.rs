@@ -18,7 +18,6 @@ use crate::util::{Writable, Writer};
 #[derive(Serialize, Clone)]
 pub enum Ast {
     Program(Vec<Ast>),
-    Decl(DeclKind),
     Stmt(StmtKind),
     Expr(ExprKind),
 }
@@ -30,9 +29,6 @@ impl Writable for Ast {
                 for decl in decls {
                     decl.write(writer)?;
                 }
-            }
-            Ast::Decl(kind) => {
-                kind.write(writer)?;
             }
             Ast::Stmt(kind) => {
                 kind.write(writer)?;

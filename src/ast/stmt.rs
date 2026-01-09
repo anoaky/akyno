@@ -3,27 +3,27 @@ use std::io::Write;
 use serde::Serialize;
 
 use crate::{
-    ast::Ast,
+    ast::{DeclKind, ExprKind},
     util::{Writable, Writer},
 };
 
 #[derive(Serialize, Clone)]
 pub enum StmtKind {
     Block {
-        decls: Vec<Ast>,
-        stmts: Vec<Ast>,
+        stmts: Vec<StmtKind>,
     },
     While {
-        expr: Box<Ast>,
-        stmt: Box<Ast>,
+        expr: Box<ExprKind>,
+        stmt: Box<StmtKind>,
     },
     If {
-        expr: Box<Ast>,
-        then: Box<Ast>,
-        els: Option<Box<Ast>>,
+        expr: Box<ExprKind>,
+        then: Box<StmtKind>,
+        els: Option<Box<StmtKind>>,
     },
-    Return(Option<Box<Ast>>),
-    ExprStmt(Box<Ast>),
+    Decl(DeclKind),
+    Return(Option<Box<ExprKind>>),
+    ExprStmt(Box<ExprKind>),
     Break,
     Continue,
 }
@@ -31,13 +31,9 @@ pub enum StmtKind {
 impl Writable for StmtKind {
     fn write<T: std::io::Write>(&self, writer: &mut Writer<'_, T>) -> anyhow::Result<()> {
         match self {
-            Self::Block { decls, stmts } => {
+            Self::Block { stmts } => {
                 writeln!(writer, "{{")?;
                 writer.inctabs();
-                for decl in decls {
-                    writer.tabs()?;
-                    decl.write(writer)?;
-                }
                 for stmt in stmts {
                     writer.tabs()?;
                     stmt.write(writer)?;
@@ -62,6 +58,7 @@ impl Writable for StmtKind {
                     els.write(writer)?;
                 }
             }
+            Self::Decl(decl) => decl.write(writer)?,
             Self::Return(rv) => {
                 write!(writer, "return")?;
                 if let Some(rv) = rv {
