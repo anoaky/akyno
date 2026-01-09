@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::Result;
 use serde::Serialize;
 
@@ -15,11 +17,19 @@ pub enum Type {
     Struct(String),
 }
 
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl Writable for Type {
     fn write<T: std::io::Write>(&self, writer: &mut T) -> anyhow::Result<()> {
         use Type::*;
         match self {
-            Int | Char | Void | Unknown | None => write!(writer, "{:?}", self)?,
+            Int | Char | Void | Unknown | None => {
+                write!(writer, "{}", self.to_string().to_lowercase())?
+            }
             Pointer(t) => {
                 t.write(writer)?;
                 write!(writer, "*")?;
