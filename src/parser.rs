@@ -39,14 +39,14 @@ impl CompilerPass for Parser {
     ()      []      .                   (17, 18)
 */
 
-fn infix_bp(category: Category) -> (u8, u8) {
+fn infix_bp(category: Category) -> Option<(u8, u8)> {
     use Category::*;
     match category {
-        Assign => (2, 1),
-        Lt | Le | Gt | Ge => (9, 10),
-        Plus | Minus => (11, 12),
-        Asterisk | Div | Rem => (13, 14),
-        _ => panic!("No precedence for category {:?}", category),
+        Assign => Some((2, 1)),
+        Lt | Le | Gt | Ge => Some((9, 10)),
+        Plus | Minus => Some((11, 12)),
+        Asterisk | Div | Rem => Some((13, 14)),
+        _ => None,
     }
 }
 
@@ -225,7 +225,12 @@ impl Parser {
 
     fn parse_expr(&mut self, min_bind: u8) -> Result<ExprKind> {
         use Category::*;
-        let mut lhs = if self.accept_any(vec![Plus, Minus]) {
+        let mut lhs = if self.accept(LPar) {
+            self.expect(LPar)?;
+            let lhs = self.parse_expr(0)?;
+            self.expect(RPar)?;
+            lhs
+        } else if self.accept_any(vec![Plus, Minus]) {
             let token = self.expect_any(vec![Plus, Minus])?;
             let rbind = prefix_bp(token.category());
             let rhs = self.parse_expr(rbind)?;
@@ -249,29 +254,32 @@ impl Parser {
             }
             let op = self.token.category();
 
-            let (lbind, rbind) = infix_bp(op);
-            if lbind < min_bind {
-                break;
-            }
-            self.next_token()?;
-            let rhs = self.parse_expr(rbind)?;
-            lhs = if op == Assign {
-                ExprKind::Assign(Box::new(lhs), Box::new(rhs))
-            } else {
-                let op = match op {
-                    Plus => OpKind::Add,
-                    Minus => OpKind::Sub,
-                    Asterisk => OpKind::Mul,
-                    Div => OpKind::Div,
-                    Rem => OpKind::Mod,
-                    Lt => OpKind::Lt,
-                    Le => OpKind::Le,
-                    Gt => OpKind::Gt,
-                    Ge => OpKind::Ge,
-                    _ => unreachable!(),
+            if let Some((lbind, rbind)) = infix_bp(op) {
+                if lbind < min_bind {
+                    break;
+                }
+                self.next_token()?;
+                let rhs = self.parse_expr(rbind)?;
+                lhs = if op == Assign {
+                    ExprKind::Assign(Box::new(lhs), Box::new(rhs))
+                } else {
+                    let op = match op {
+                        Plus => OpKind::Add,
+                        Minus => OpKind::Sub,
+                        Asterisk => OpKind::Mul,
+                        Div => OpKind::Div,
+                        Rem => OpKind::Mod,
+                        Lt => OpKind::Lt,
+                        Le => OpKind::Le,
+                        Gt => OpKind::Gt,
+                        Ge => OpKind::Ge,
+                        _ => unreachable!(),
+                    };
+                    ExprKind::BinOp(Box::new(lhs), op, Box::new(rhs))
                 };
-                ExprKind::BinOp(Box::new(lhs), op, Box::new(rhs))
+                continue;
             }
+            break;
         }
         Ok(lhs)
     }

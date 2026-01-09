@@ -28,8 +28,8 @@ Program([
           expr: BinOp(VarExpr("a"), Lt, VarExpr("b")),
           stmt: Block(
             stmts: [
-              ExprStmt(Assign(VarExpr("c"), BinOp(Literal(Int(2)), Mul, VarExpr("c")))),
-              ExprStmt(Assign(VarExpr("b"), BinOp(VarExpr("b"), Sub, Literal(Int(1))))),
+              ExprStmt(Assign(VarExpr("c"), BinOp(Literal(Int(2)), Mul, BinOp(VarExpr("c"), Add, Literal(Int(1)))))),
+              ExprStmt(Assign(VarExpr("b"), BinOp(VarExpr("b"), Mul, BinOp(VarExpr("b"), Sub, Literal(Int(1)))))),
             ],
           ),
         ),
