@@ -1,8 +1,8 @@
 use anyhow::Result;
-use std::{path::Path, process::ExitCode};
+use std::path::Path;
 
 use toyc::{
-    lexer::{Category, Token, Tokeniser},
+    lexer::{Category, Tokeniser},
     parser::Parser,
     util::{CompilerPass, Writable},
 };
@@ -27,6 +27,8 @@ pub fn main() -> Result<()> {
         }
         let mut out = std::io::stdout();
         program.write(&mut out)?;
+    } else {
+        usage();
     }
     Ok(())
 }

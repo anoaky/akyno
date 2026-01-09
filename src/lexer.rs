@@ -437,10 +437,6 @@ impl Reader {
     pub fn has_next(&self) -> bool {
         self.buf[1] != 0
     }
-
-    pub fn pos(&self) -> (u32, u32) {
-        (self.line, self.col)
-    }
 }
 
 #[cfg(test)]
@@ -461,19 +457,6 @@ mod test {
         assert_eq!(reader.peek(), '/');
         assert_eq!(reader.next()?, '/');
         assert_eq!(reader.peek(), '*');
-        Ok(())
-    }
-
-    #[test]
-    fn check_pos() -> Result<()> {
-        let mut reader = Reader::from_file(File::open("tests/resources/source/decls.tc")?)?;
-        assert_eq!(reader.pos(), (1, 1));
-        reader.next()?;
-        assert_eq!(reader.pos(), (1, 2));
-        while reader.next()? != ';' {}
-        assert_eq!(reader.pos(), (7, 7));
-        reader.next()?;
-        assert_eq!(reader.pos(), (8, 1));
         Ok(())
     }
 }

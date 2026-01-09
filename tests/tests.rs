@@ -12,7 +12,7 @@ use toyc::{
     ast::UnboundAst,
     lexer::{Category, Tokeniser},
     parser::Parser,
-    util::{CompilerPass, Writable},
+    util::CompilerPass,
 };
 
 const LEXER_FAIL: u32 = 250;
@@ -25,13 +25,6 @@ macro_rules! set_snapshot_suffix {
         settings.set_snapshot_suffix(format!($($expr,)*));
         let _guard = settings.bind_to_scope();
     }
-}
-
-fn format_program(prog: &UnboundAst) -> Result<String> {
-    let mut out = Vec::new();
-    prog.write(&mut out)?;
-    let s = String::from_utf8(out)?;
-    Ok(s)
 }
 
 fn test_lexer(path: &Path) -> u32 {

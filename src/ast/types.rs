@@ -24,7 +24,7 @@ impl Display for Type {
 }
 
 impl Writable for Type {
-    fn write<T: std::io::Write>(&self, writer: &mut T) -> anyhow::Result<()> {
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<()> {
         use Type::*;
         match self {
             Int | Char | Void | Unknown | None => {
