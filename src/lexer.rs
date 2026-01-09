@@ -238,22 +238,19 @@ impl Tokeniser {
                     _ => Token::blank(Div, line, col),
                 },
                 _ if c.is_ascii_whitespace() => self.next_token()?,
-                _ if is_valid_ident_start(c) => self.try_read_keyword(
-                    c.to_string(),
-                    vec![
-                        "if".to_string(),
-                        "int".to_string(),
-                        "void".to_string(),
-                        "char".to_string(),
-                        "else".to_string(),
-                        "while".to_string(),
-                        "return".to_string(),
-                        "struct".to_string(),
-                        "sizeof".to_string(),
-                        "continue".to_string(),
-                        "break".to_string(),
-                    ],
-                )?,
+                _ if is_valid_ident_start(c) => self.try_read_keyword(c.to_string(), vec![
+                    "if".to_string(),
+                    "int".to_string(),
+                    "void".to_string(),
+                    "char".to_string(),
+                    "else".to_string(),
+                    "while".to_string(),
+                    "return".to_string(),
+                    "struct".to_string(),
+                    "sizeof".to_string(),
+                    "continue".to_string(),
+                    "break".to_string(),
+                ])?,
                 _ if c.is_ascii_digit() => self.try_read_int(c.to_string())?,
                 _ => self.invalid(c, line, col)?,
             };
@@ -441,8 +438,9 @@ impl Reader {
 
 #[cfg(test)]
 mod test {
-    use crate::lexer::Reader;
     use std::{fs::File, io::Result};
+
+    use crate::lexer::Reader;
 
     #[test]
     fn check_next() -> Result<()> {

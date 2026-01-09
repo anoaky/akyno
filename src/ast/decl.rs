@@ -1,14 +1,14 @@
 use serde::Serialize;
 
-use crate::util::Writable;
-
-use super::{types::Type, unbound::UnboundAst};
+use super::types::Type;
+use crate::{ast::Ast, util::Writable};
 
 #[derive(Serialize, Clone)]
 pub enum DeclKind {
     VarDecl(Type, String),
-    StructTypeDecl(Type, String, Vec<UnboundAst>),
-    FunDecl(Type, String, Vec<UnboundAst>),
+    StructTypeDecl(Type, String, Vec<Ast>),
+    FunDecl(Type, String, Vec<Ast>),
+    FunDefn { decl: Box<Ast>, block: Box<Ast> },
 }
 
 impl Writable for DeclKind {
@@ -16,7 +16,7 @@ impl Writable for DeclKind {
         match self {
             DeclKind::VarDecl(t, s) => {
                 t.write(writer)?;
-                write!(writer, " {}", s)?;
+                writeln!(writer, " {};", s)?;
             }
             DeclKind::StructTypeDecl(_, name, fields) => {
                 writeln!(writer, "struct {} {{", name)?;
@@ -35,6 +35,11 @@ impl Writable for DeclKind {
                     write!(writer, ",")?;
                 }
                 write!(writer, ")")?;
+            }
+            DeclKind::FunDefn { decl, block } => {
+                decl.write(writer)?;
+                write!(writer, " ")?;
+                block.write(writer)?;
             }
         }
         Ok(())

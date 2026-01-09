@@ -5,11 +5,10 @@ use std::{
 };
 
 use anyhow::Result;
-
 use insta::assert_ron_snapshot;
 use rstest::rstest;
 use toyc::{
-    ast::UnboundAst,
+    ast::Ast,
     lexer::{Category, Tokeniser},
     parser::Parser,
     util::CompilerPass,
@@ -37,7 +36,7 @@ fn test_lexer(path: &Path) -> u32 {
     }
 }
 
-fn test_parser(path: &Path) -> Result<(u32, UnboundAst)> {
+fn test_parser(path: &Path) -> Result<(u32, Ast)> {
     let tokeniser = Tokeniser::from_path(path).unwrap();
     let mut parser = Parser::with_tokeniser(tokeniser)?;
     let program = parser.parse()?;

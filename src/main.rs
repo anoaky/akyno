@@ -1,6 +1,6 @@
-use anyhow::Result;
 use std::path::Path;
 
+use anyhow::Result;
 use toyc::{
     lexer::{Category, Tokeniser},
     parser::Parser,
