@@ -4,9 +4,8 @@ OUT
 5120
 */
 void main() {
-  int a = 0;
-  int b = 10;
-  int c = 5;
+  int a = 0, b = 10;
+  int c = 5, d, e = 2;
   while (a < b) {
     c = 2 * c;
     b = b - 1;

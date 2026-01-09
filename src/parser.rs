@@ -345,7 +345,7 @@ impl Parser {
                 };
                 prog.push(decl);
             } else {
-                prog.push(Ast::Stmt(StmtKind::Decl(self.parse_var_decl()?)));
+                prog.push(Ast::Stmt(StmtKind::Decl(self.parse_var_decls()?)));
                 self.expect_any(vec![Semi])?;
             }
         }
@@ -407,7 +407,7 @@ impl Parser {
                 Ok(StmtKind::Break)
             }
             Int | Char | Void | Struct => {
-                let decl = self.parse_var_decl()?;
+                let decl = self.parse_var_decls()?;
                 self.expect(Semi)?;
                 Ok(StmtKind::Decl(decl))
             }
@@ -468,33 +468,46 @@ impl Parser {
         Ok(ty)
     }
 
-    fn parse_var_decl(&mut self) -> Result<DeclKind> {
+    fn parse_var_decls(&mut self) -> Result<DeclKind> {
         use Category::*;
         let mut ty = self.parse_types()?;
-        let id = self.expect_any(vec![Identifier])?;
-        let mut lens: VecDeque<usize> = VecDeque::new();
-        while self.accept_any(vec![LBrack]) {
-            self.expect_any(vec![LBrack])?;
-            let i = self.expect_any(vec![IntLiteral])?;
-            self.expect_any(vec![RBrack])?;
-            if i.category() == IntLiteral {
-                lens.push_front(i.data.parse::<usize>()?);
+        let mut ids: Vec<String> = vec![];
+        let mut exprs: Vec<Option<ExprKind>> = vec![];
+        loop {
+            let id = self.expect_any(vec![Identifier])?;
+            let mut lens: VecDeque<usize> = VecDeque::new();
+            while self.accept_any(vec![LBrack]) {
+                self.expect_any(vec![LBrack])?;
+                let i = self.expect_any(vec![IntLiteral])?;
+                self.expect_any(vec![RBrack])?;
+                if i.category() == IntLiteral {
+                    lens.push_front(i.data.parse::<usize>()?);
+                }
             }
-        }
-        while !lens.is_empty() {
-            ty = Type::Array(
-                lens.pop_front()
-                    .expect("Failed to pop non-empty VecDeque ??"),
-                Box::new(ty),
-            );
-        }
-        let expr = if self.accept(Assign) {
+            while !lens.is_empty() {
+                ty = Type::Array(
+                    lens.pop_front()
+                        .expect("Failed to pop non-empty VecDeque ??"),
+                    Box::new(ty),
+                );
+            }
+            let expr = if self.accept(Assign) {
+                self.next_token()?;
+                Some(self.parse_expr(0)?)
+            } else {
+                None
+            };
+            ids.push(id.data);
+            exprs.push(expr);
+            if !self.accept(Comma) {
+                break;
+            }
             self.next_token()?;
-            Some(self.parse_expr(0)?)
+        }
+        if ids.len() == 1 {
+            Ok(DeclKind::VarDecl(ty, ids[0].clone(), exprs[0].clone()))
         } else {
-            None
-        };
-
-        Ok(DeclKind::VarDecl(ty, id.data, expr))
+            Ok(DeclKind::MultiVarDecl(ty, ids, exprs))
+        }
     }
 }

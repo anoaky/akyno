@@ -10,6 +10,7 @@ use crate::{
 
 #[derive(Serialize, Clone)]
 pub enum DeclKind {
+    MultiVarDecl(Type, Vec<String>, Vec<Option<ExprKind>>),
     VarDecl(Type, String, Option<ExprKind>),
     StructTypeDecl(Type, String, Vec<DeclKind>),
     FunDecl(Type, String, Vec<DeclKind>),
@@ -22,6 +23,22 @@ pub enum DeclKind {
 impl Writable for DeclKind {
     fn write<T: std::io::Write>(&self, writer: &mut Writer<'_, T>) -> anyhow::Result<()> {
         match self {
+            DeclKind::MultiVarDecl(t, s, e) => {
+                t.write(writer)?;
+                for i in 0..s.len() {
+                    let id = &s[i];
+                    let expr = &e[i];
+                    write!(writer, " {}", id)?;
+                    if let Some(expr) = expr {
+                        write!(writer, " = ")?;
+                        expr.write(writer)?;
+                    }
+                    if i < s.len() - 1 {
+                        write!(writer, ",")?;
+                    }
+                }
+                writeln!(writer, ";")?;
+            }
             DeclKind::VarDecl(t, s, e) => {
                 t.write(writer)?;
                 write!(writer, " {}", s)?;

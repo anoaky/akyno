@@ -1,0 +1,14 @@
+---
+source: tests/tests.rs
+expression: ast
+snapshot_kind: text
+---
+Program([
+  Stmt(Decl(StructTypeDecl(Struct("foo"), "foo", [
+    VarDecl(Int, "bar", None),
+    VarDecl(Int, "baz", None),
+  ]))),
+  Stmt(Decl(VarDecl(Int, "foo", None))),
+  Stmt(Decl(VarDecl(Char, "bar", None))),
+  Stmt(Decl(VarDecl(Char, "baz", None))),
+])

@@ -1,0 +1,39 @@
+---
+source: tests/tests.rs
+expression: ast
+snapshot_kind: text
+---
+Program([
+  Stmt(Decl(FunDefn(
+    decl: Stmt(Decl(FunDecl(Void, "main", []))),
+    block: Block(
+      stmts: [
+        Decl(MultiVarDecl(Int, [
+          "a",
+          "b",
+        ], [
+          Some(Literal(Int(0))),
+          Some(Literal(Int(10))),
+        ])),
+        Decl(MultiVarDecl(Int, [
+          "c",
+          "d",
+          "e",
+        ], [
+          Some(Literal(Int(5))),
+          None,
+          Some(Literal(Int(2))),
+        ])),
+        While(
+          expr: BinOp(VarExpr("a"), Lt, VarExpr("b")),
+          stmt: Block(
+            stmts: [
+              ExprStmt(Assign(VarExpr("c"), BinOp(Literal(Int(2)), Mul, VarExpr("c")))),
+              ExprStmt(Assign(VarExpr("b"), BinOp(VarExpr("b"), Sub, Literal(Int(1))))),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ))),
+])
