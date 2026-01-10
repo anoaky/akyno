@@ -206,6 +206,13 @@ impl Parser {
                 let id = self.expect(Identifier)?;
                 ExprKind::VarExpr(id.data)
             }
+            Sizeof => {
+                self.expect(Sizeof)?;
+                self.expect(LPar)?;
+                let t = self.parse_types()?;
+                self.expect(RPar)?;
+                ExprKind::Literal(Literal::Sizeof(t))
+            }
             _ => {
                 self.expect_any(vec![
                     IntLiteral,
@@ -223,15 +230,6 @@ impl Parser {
     fn parse_block(&mut self) -> Result<StmtKind> {
         let mut stmts = vec![];
         self.expect(Category::LBrace)?;
-        // while self.accept_any(vec![
-        //     Category::Int,
-        //     Category::Char,
-        //     Category::Void,
-        //     Category::Struct,
-        // ]) {
-        //     vds.push(self.parse_var_decl()?);
-        //     self.expect(Category::Semi)?;
-        // }
         while !self.accept_any(vec![Category::RBrace, Category::Eof]) {
             stmts.push(self.parse_stmt()?);
         }
