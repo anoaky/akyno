@@ -1,4 +1,6 @@
-// 245
+/*
+245
+*/
 #include "minic-stdlib.h"
 
 int main() {

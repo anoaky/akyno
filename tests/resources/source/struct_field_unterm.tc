@@ -1,4 +1,6 @@
-// 245
+/*
+245
+*/
 struct x {
     int a;
     int b

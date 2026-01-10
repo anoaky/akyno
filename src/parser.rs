@@ -62,7 +62,7 @@ fn prefix_bp(category: Category) -> u8 {
 fn postfix_bp(category: Category) -> Option<u8> {
     use Category::*;
     match category {
-        LPar => Some(17),
+        LPar | Dot => Some(17),
         _ => None,
     }
 }
@@ -272,7 +272,7 @@ impl Parser {
         };
         loop {
             if !self.accept_any(vec![
-                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge, Eq, Ne, LPar,
+                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge, Eq, Ne, LPar, Dot,
             ]) {
                 break;
             }
@@ -296,8 +296,13 @@ impl Parser {
                         self.expect(RPar)?;
                         ExprKind::FunCallExpr(Box::new(lhs), args)
                     }
+                    Dot => {
+                        let field_token = self.expect(Identifier)?;
+                        ExprKind::FieldAccessExpr(Box::new(lhs), field_token.data)
+                    }
                     _ => lhs,
-                }
+                };
+                continue;
             }
 
             if let Some((lbind, rbind)) = infix_bp(op) {

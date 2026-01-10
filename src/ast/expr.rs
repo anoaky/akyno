@@ -18,6 +18,7 @@ pub enum ExprKind {
     TypecastExpr(Type, Box<ExprKind>),
     RefExpr(Box<ExprKind>),
     DerefExpr(Box<ExprKind>),
+    FieldAccessExpr(Box<ExprKind>, String),
 }
 
 #[derive(Serialize, Clone, Copy)]
@@ -108,6 +109,10 @@ impl Writable for ExprKind {
             Self::DerefExpr(expr) => {
                 write!(writer, "*")?;
                 expr.write(writer, false)?;
+            }
+            Self::FieldAccessExpr(expr, field) => {
+                expr.write(writer, false)?;
+                write!(writer, ".{}", field)?;
             }
         };
         if eol {
