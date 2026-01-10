@@ -19,6 +19,7 @@ pub enum ExprKind {
     RefExpr(Box<ExprKind>),
     DerefExpr(Box<ExprKind>),
     FieldAccessExpr(Box<ExprKind>, String),
+    ArrayAccessExpr(Box<ExprKind>, Box<ExprKind>),
 }
 
 #[derive(Serialize, Clone, Copy)]
@@ -113,6 +114,12 @@ impl Writable for ExprKind {
             Self::FieldAccessExpr(expr, field) => {
                 expr.write(writer, false)?;
                 write!(writer, ".{}", field)?;
+            }
+            Self::ArrayAccessExpr(array, index) => {
+                array.write(writer, false)?;
+                write!(writer, "[")?;
+                index.write(writer, false)?;
+                write!(writer, "]")?;
             }
         };
         if eol {

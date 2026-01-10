@@ -43,6 +43,8 @@ fn infix_bp(category: Category) -> Option<(u8, u8)> {
     use Category::*;
     match category {
         Assign => Some((2, 1)),
+        LogOr => Some((3, 4)),
+        LogAnd => Some((5, 6)),
         Eq | Ne => Some((7, 8)),
         Lt | Le | Gt | Ge => Some((9, 10)),
         Plus | Minus => Some((11, 12)),
@@ -62,7 +64,7 @@ fn prefix_bp(category: Category) -> u8 {
 fn postfix_bp(category: Category) -> Option<u8> {
     use Category::*;
     match category {
-        LPar | Dot => Some(17),
+        LPar | Dot | LBrack => Some(17),
         _ => None,
     }
 }
@@ -272,7 +274,8 @@ impl Parser {
         };
         loop {
             if !self.accept_any(vec![
-                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge, Eq, Ne, LPar, Dot,
+                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge, Eq, Ne, LPar, Dot, LogOr,
+                LogAnd, LBrack,
             ]) {
                 break;
             }
@@ -300,6 +303,11 @@ impl Parser {
                         let field_token = self.expect(Identifier)?;
                         ExprKind::FieldAccessExpr(Box::new(lhs), field_token.data)
                     }
+                    LBrack => {
+                        let ind = self.parse_expr(0)?;
+                        self.expect(RBrack)?;
+                        ExprKind::ArrayAccessExpr(Box::new(lhs), Box::new(ind))
+                    }
                     _ => lhs,
                 };
                 continue;
@@ -326,6 +334,8 @@ impl Parser {
                         Ge => OpKind::Ge,
                         Eq => OpKind::Eq,
                         Ne => OpKind::Ne,
+                        LogOr => OpKind::Or,
+                        LogAnd => OpKind::And,
                         _ => unreachable!(),
                     };
                     ExprKind::BinOp(Box::new(lhs), op, Box::new(rhs))
