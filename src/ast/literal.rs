@@ -13,7 +13,7 @@ pub enum Literal {
 }
 
 impl Writable for Literal {
-    fn write<T: Write>(&self, writer: &mut Writer<'_, T>) -> Result<()> {
+    fn write<T: Write>(&self, writer: &mut Writer<'_, T>, _: bool) -> Result<()> {
         match self {
             Literal::Int(i) => write!(writer, "{}", i),
             Literal::Char(c) => write!(writer, "'{}'", c),

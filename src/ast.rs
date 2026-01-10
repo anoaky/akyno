@@ -23,18 +23,18 @@ pub enum Ast {
 }
 
 impl Writable for Ast {
-    fn write<T: Write>(&self, writer: &mut Writer<'_, T>) -> Result<()> {
+    fn write<T: Write>(&self, writer: &mut Writer<'_, T>, eol: bool) -> Result<()> {
         match self {
             Ast::Program(decls) => {
                 for decl in decls {
-                    decl.write(writer)?;
+                    decl.write(writer, true)?;
                 }
             }
             Ast::Stmt(kind) => {
-                kind.write(writer)?;
+                kind.write(writer, eol)?;
             }
             Ast::Expr(kind) => {
-                kind.write(writer)?;
+                kind.write(writer, eol)?;
             }
         };
         Ok(())

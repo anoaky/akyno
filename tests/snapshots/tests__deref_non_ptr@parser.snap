@@ -1,0 +1,17 @@
+---
+source: tests/tests.rs
+expression: ast
+snapshot_kind: text
+---
+Program([
+  Stmt(Decl(FunDefn(
+    decl: Stmt(Decl(FunDecl(Int, "main", []))),
+    block: Block(
+      stmts: [
+        Decl(VarDecl(Int, "i", None)),
+        ExprStmt(Assign(VarExpr("i"), Literal(Int(0)))),
+        Return(Some(DerefExpr(VarExpr("i")))),
+      ],
+    ),
+  ))),
+])

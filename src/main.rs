@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    io::{BufWriter, stdout},
+    path::Path,
+};
 
 use anyhow::Result;
 use toyc::{
@@ -25,9 +28,9 @@ pub fn main() -> Result<()> {
         if parser.has_error() {
             std::process::exit(PARSER_FAIL);
         }
-        let mut out = std::io::stdout();
+        let mut out = BufWriter::new(stdout());
         let mut writer = Writer::new(&mut out);
-        program.write(&mut writer)?;
+        program.write(&mut writer, false)?;
     } else {
         usage();
     }

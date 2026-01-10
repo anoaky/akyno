@@ -43,6 +43,7 @@ fn infix_bp(category: Category) -> Option<(u8, u8)> {
     use Category::*;
     match category {
         Assign => Some((2, 1)),
+        Eq | Ne => Some((7, 8)),
         Lt | Le | Gt | Ge => Some((9, 10)),
         Plus | Minus => Some((11, 12)),
         Asterisk | Div | Rem => Some((13, 14)),
@@ -53,7 +54,7 @@ fn infix_bp(category: Category) -> Option<(u8, u8)> {
 fn prefix_bp(category: Category) -> u8 {
     use Category::*;
     match category {
-        Plus | Minus => 15,
+        Plus | Minus | And | Asterisk => 15,
         _ => panic!("No precedence for category {:?}", category),
     }
 }
@@ -187,7 +188,6 @@ impl Parser {
     fn parse_atom(&mut self) -> Result<ExprKind> {
         use Category::*;
         let expr = match self.token.category() {
-            LPar => unimplemented!(),
             IntLiteral => {
                 let l = self.expect(IntLiteral)?;
                 ExprKind::Literal(Literal::Int(l.data.parse()?))
@@ -196,13 +196,16 @@ impl Parser {
                 let l = self.expect(CharLiteral)?;
                 ExprKind::Literal(Literal::Char(l.data.parse()?))
             }
+            StrLiteral => {
+                let l = self.expect(StrLiteral)?;
+                ExprKind::Literal(Literal::Str(l.data))
+            }
             Identifier => {
                 let id = self.expect(Identifier)?;
                 ExprKind::VarExpr(id.data)
             }
             _ => {
                 self.expect_any(vec![
-                    LPar,
                     IntLiteral,
                     CharLiteral,
                     StrLiteral,
@@ -249,8 +252,8 @@ impl Parser {
                 self.expect(RPar)?;
                 lhs
             }
-        } else if self.accept_any(vec![Plus, Minus]) {
-            let token = self.expect_any(vec![Plus, Minus])?;
+        } else if self.accept_any(vec![Plus, Minus, Asterisk, And]) {
+            let token = self.expect_any(vec![Plus, Minus, Asterisk, And])?;
             let rbind = prefix_bp(token.category());
             let rhs = self.parse_expr(rbind)?;
             match token.category() {
@@ -260,6 +263,8 @@ impl Parser {
                     OpKind::Sub,
                     Box::new(rhs),
                 ),
+                Asterisk => ExprKind::DerefExpr(Box::new(rhs)),
+                And => ExprKind::RefExpr(Box::new(rhs)),
                 _ => unreachable!(),
             }
         } else {
@@ -267,7 +272,7 @@ impl Parser {
         };
         loop {
             if !self.accept_any(vec![
-                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge, LPar,
+                Plus, Minus, Assign, Asterisk, Div, Rem, Lt, Le, Gt, Ge, Eq, Ne, LPar,
             ]) {
                 break;
             }
@@ -314,6 +319,8 @@ impl Parser {
                         Le => OpKind::Le,
                         Gt => OpKind::Gt,
                         Ge => OpKind::Ge,
+                        Eq => OpKind::Eq,
+                        Ne => OpKind::Ne,
                         _ => unreachable!(),
                     };
                     ExprKind::BinOp(Box::new(lhs), op, Box::new(rhs))

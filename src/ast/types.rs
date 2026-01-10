@@ -24,21 +24,21 @@ impl Display for Type {
 }
 
 impl Writable for Type {
-    fn write<T: std::io::Write>(&self, writer: &mut Writer<T>) -> Result<()> {
+    fn write<T: std::io::Write>(&self, writer: &mut Writer<T>, _: bool) -> Result<()> {
         use Type::*;
         match self {
             Int | Char | Void | Unknown | None => {
                 write!(writer, "{}", self.to_string().to_lowercase())?
             }
             Pointer(t) => {
-                t.write(writer)?;
+                t.write(writer, false)?;
                 write!(writer, "*")?;
             }
             Struct(s) => write!(writer, "struct {}", s)?,
             Array(s, t) => {
                 let mut out = Vec::new();
                 let mut new_writer = Writer::new(&mut out);
-                t.write(&mut new_writer)?;
+                t.write(&mut new_writer, false)?;
                 let inner_type = String::from_utf8(out)?;
                 let split_point = inner_type.find("[");
                 match split_point {

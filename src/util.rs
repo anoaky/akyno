@@ -11,7 +11,7 @@ pub trait CompilerPass {
 }
 
 pub trait Writable {
-    fn write<T: Write>(&self, writer: &mut Writer<T>) -> Result<()>;
+    fn write<T: Write>(&self, writer: &mut Writer<T>, eol: bool) -> Result<()>;
 }
 
 pub struct Writer<'a, T: Write> {
@@ -28,6 +28,9 @@ impl<'a, T: Write> Writer<'a, T> {
             write!(self, "\t")?;
         }
         Ok(())
+    }
+    pub fn tabc(&self) -> u8 {
+        self.tabc
     }
     pub fn inctabs(&mut self) {
         self.tabc += 1;

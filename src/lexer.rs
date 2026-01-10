@@ -52,6 +52,24 @@ impl Tokeniser {
         }
     }
 
+    fn try_read_include(&mut self, data: String) -> Result<Token> {
+        let expected = "#include";
+        if data.clone() + &self.reader.peek().to_string() == expected {
+            self.reader.next()?;
+            Ok(Token::new(
+                Category::Include,
+                None,
+                self.reader.line,
+                self.reader.col,
+            ))
+        } else if data.len() < expected.len() && expected.starts_with(&data) {
+            let c = self.reader.next()?;
+            self.try_read_include(format!("{}{}", data, c))
+        } else {
+            self.invalid(self.reader.peek(), self.reader.line, self.reader.col)
+        }
+    }
+
     fn try_read_int(&mut self, data: String) -> Result<Token> {
         if !self.reader.peek().is_ascii_digit() {
             Ok(Token::new(
@@ -191,6 +209,7 @@ impl Tokeniser {
             let tok = match c {
                 '\'' => self.try_read_char()?,
                 '"' => self.try_read_string("".to_owned())?,
+                '#' => self.try_read_include("#".to_string())?,
                 '{' => Token::blank(LBrace, line, col),
                 '}' => Token::blank(RBrace, line, col),
                 '(' => Token::blank(LPar, line, col),
