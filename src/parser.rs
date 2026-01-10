@@ -213,6 +213,19 @@ impl Parser {
                 self.expect(RPar)?;
                 ExprKind::Literal(Literal::Sizeof(t))
             }
+            LPar => {
+                self.expect(LPar)?;
+                if self.accept_any(vec![Int, Char, Void, Struct]) {
+                    let ty = self.parse_types()?;
+                    self.expect(RPar)?;
+                    let rhs = self.parse_expr(15)?;
+                    ExprKind::TypecastExpr(ty, Box::new(rhs))
+                } else {
+                    let lhs = self.parse_expr(0)?;
+                    self.expect(RPar)?;
+                    lhs
+                }
+            }
             _ => {
                 self.expect_any(vec![
                     IntLiteral,
@@ -240,19 +253,7 @@ impl Parser {
 
     fn parse_expr(&mut self, min_bind: u8) -> Result<ExprKind> {
         use Category::*;
-        let mut lhs = if self.accept(LPar) {
-            self.expect(LPar)?;
-            if self.accept_any(vec![Int, Char, Void, Struct]) {
-                let ty = self.parse_types()?;
-                self.expect(RPar)?;
-                let rhs = self.parse_expr(15)?;
-                ExprKind::TypecastExpr(ty, Box::new(rhs))
-            } else {
-                let lhs = self.parse_expr(0)?;
-                self.expect(RPar)?;
-                lhs
-            }
-        } else if self.accept_any(vec![Plus, Minus, Asterisk, And]) {
+        let mut lhs = if self.accept_any(vec![Plus, Minus, Asterisk, And]) {
             let token = self.expect_any(vec![Plus, Minus, Asterisk, And])?;
             let rbind = prefix_bp(token.category());
             let rhs = self.parse_expr(rbind)?;
