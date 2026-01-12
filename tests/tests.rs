@@ -8,7 +8,7 @@ use anyhow::Result;
 use insta::assert_ron_snapshot;
 use rstest::rstest;
 use toyc::{
-    ast::Ast,
+    ast::DeclKind,
     lexer::{Category, Tokeniser},
     parser::Parser,
     util::CompilerPass,
@@ -17,6 +17,8 @@ use toyc::{
 const LEXER_FAIL: u32 = 250;
 const PARSER_FAIL: u32 = 245;
 const PASS: u32 = 0;
+
+type Ast = Vec<DeclKind>;
 
 macro_rules! set_snapshot_suffix {
     ($($expr:expr),*) => {

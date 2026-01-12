@@ -1,10 +1,10 @@
-use std::io::Write;
+use std::{io::Write, rc::Rc};
 
 use serde::Serialize;
 
-use super::types::Type;
+use super::{BoundExpr, BoundStmt, types::Type};
 use crate::{
-    ast::{Ast, ExprKind, StmtKind},
+    ast::{ExprKind, StmtKind},
     util::{Writable, Writer},
 };
 
@@ -15,8 +15,27 @@ pub enum DeclKind {
     StructTypeDecl(Type, String, Vec<DeclKind>),
     FunDecl(Type, String, Vec<DeclKind>),
     FunDefn {
-        decl: Box<Ast>,
+        decl: Box<DeclKind>,
         block: Box<StmtKind>,
+    },
+}
+
+#[derive(Serialize, Clone)]
+pub enum BoundDecl {
+    VarDecl {
+        ty: Type,
+        name: String,
+        expr: Option<BoundExpr>,
+    },
+    StructTypeDecl(Type, String, Vec<Rc<BoundDecl>>),
+    FunDecl {
+        ty: Type,
+        name: String,
+        params: Vec<Rc<BoundDecl>>,
+    },
+    FunDefn {
+        decl: Rc<BoundDecl>,
+        block: Box<BoundStmt>,
     },
 }
 

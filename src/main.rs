@@ -5,13 +5,23 @@ use std::{
 
 use anyhow::Result;
 use toyc::{
+    ast::DeclKind,
     lexer::{Category, Tokeniser},
     parser::Parser,
+    sem::{Binder, Scope},
     util::{CompilerPass, Writable, Writer},
 };
 
 const PARSER_FAIL: i32 = 245;
 
+fn parse(tokeniser: Tokeniser) -> Result<Vec<DeclKind>> {
+    let mut parser = Parser::with_tokeniser(tokeniser)?;
+    let program = parser.parse()?;
+    if parser.has_error() {
+        std::process::exit(PARSER_FAIL);
+    }
+    Ok(program)
+}
 pub fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let mut tokeniser = Tokeniser::from_path(Path::new(&args[2]))?;
@@ -23,14 +33,17 @@ pub fn main() -> Result<()> {
             t = tokeniser.next_token()?;
         }
     } else if args[1] == "-parser" {
-        let mut parser = Parser::with_tokeniser(tokeniser)?;
-        let program = parser.parse()?;
-        if parser.has_error() {
-            std::process::exit(PARSER_FAIL);
-        }
+        let program = parse(tokeniser)?;
         let mut out = BufWriter::new(stdout());
         let mut writer = Writer::new(&mut out);
-        program.write(&mut writer, false)?;
+        for decl in program {
+            decl.write(&mut writer, true)?;
+        }
+    } else if args[1] == "-sem" {
+        let program = parse(tokeniser)?;
+        let mut binder = Binder::new();
+        let bound_ast = binder.bind(program, &mut Scope::new())?;
+        println!("Name analysis successful");
     } else {
         usage();
     }

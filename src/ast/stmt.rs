@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{io::Write, rc::Rc};
 
 use serde::Serialize;
 
@@ -6,6 +6,8 @@ use crate::{
     ast::{DeclKind, ExprKind},
     util::{Writable, Writer},
 };
+
+use super::{decl::BoundDecl, expr::BoundExpr};
 
 #[derive(Serialize, Clone)]
 pub enum StmtKind {
@@ -24,6 +26,18 @@ pub enum StmtKind {
     Decl(DeclKind),
     Return(Option<Box<ExprKind>>),
     ExprStmt(Box<ExprKind>),
+    Break,
+    Continue,
+}
+
+#[derive(Serialize, Clone)]
+pub enum BoundStmt {
+    Block(Vec<BoundStmt>),
+    While(Box<BoundExpr>, Box<BoundStmt>),
+    If(Box<BoundExpr>, Box<BoundStmt>, Option<Box<BoundStmt>>),
+    Decl(Rc<BoundDecl>),
+    Return(Option<Box<BoundExpr>>),
+    ExprStmt(Box<BoundExpr>),
     Break,
     Continue,
 }

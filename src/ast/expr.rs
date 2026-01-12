@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{io::Write, rc::Rc};
 
 use serde::Serialize;
 
@@ -6,6 +6,8 @@ use crate::{
     ast::{Literal, Type},
     util::{Writable, Writer},
 };
+
+use super::BoundDecl;
 
 #[derive(Serialize, Clone)]
 pub enum ExprKind {
@@ -20,6 +22,34 @@ pub enum ExprKind {
     DerefExpr(Box<ExprKind>),
     FieldAccessExpr(Box<ExprKind>, String),
     ArrayAccessExpr(Box<ExprKind>, Box<ExprKind>),
+}
+
+#[derive(Serialize, Clone)]
+pub enum BoundExpr {
+    InvalidExpr,
+    Literal(Literal),
+    VarExpr(Rc<BoundDecl>),
+    BinOp {
+        lhs: Box<BoundExpr>,
+        op: OpKind,
+        rhs: Box<BoundExpr>,
+    },
+    Assign {
+        lhs: Box<BoundExpr>,
+        rhs: Box<BoundExpr>,
+    },
+    FunCallExpr {
+        defn: Rc<BoundDecl>,
+        args: Vec<BoundExpr>,
+    },
+    TypecastExpr {
+        to: Type,
+        expr: Box<BoundExpr>,
+    },
+    RefExpr(Box<BoundExpr>),
+    DerefExpr(Box<BoundExpr>),
+    FieldAccessExpr(Box<BoundExpr>, String),
+    ArrayAccessExpr(Box<BoundExpr>, Box<BoundExpr>),
 }
 
 #[derive(Serialize, Clone, Copy)]

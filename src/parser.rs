@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use anyhow::{Ok, Result, bail};
 
 use crate::{
-    ast::{Ast, DeclKind, ExprKind, Literal, OpKind, StmtKind, Type},
+    ast::{DeclKind, ExprKind, Literal, OpKind, StmtKind, Type},
     lexer::{Category, Token, Tokeniser},
     util::CompilerPass,
 };
@@ -81,7 +81,7 @@ impl Parser {
         })
     }
 
-    pub fn parse(&mut self) -> Result<Ast> {
+    pub fn parse(&mut self) -> Result<Vec<DeclKind>> {
         self.parse_program()
     }
 
@@ -346,7 +346,7 @@ impl Parser {
         Ok(lhs)
     }
 
-    fn parse_fun_decl(&mut self) -> Result<Ast> {
+    fn parse_fun_decl(&mut self) -> Result<DeclKind> {
         let return_type = self.parse_types()?;
         let id = self.expect_any(vec![Category::Identifier])?;
         self.expect_any(vec![Category::LPar])?;
@@ -356,11 +356,7 @@ impl Parser {
             vec![]
         };
         self.expect(Category::RPar)?;
-        Ok(Ast::Stmt(StmtKind::Decl(DeclKind::FunDecl(
-            return_type,
-            id.data,
-            params,
-        ))))
+        Ok(DeclKind::FunDecl(return_type, id.data, params))
     }
 
     fn parse_includes(&mut self) -> Result<()> {
@@ -408,26 +404,26 @@ impl Parser {
         Ok(params)
     }
 
-    fn parse_program(&mut self) -> Result<Ast> {
+    fn parse_program(&mut self) -> Result<Vec<DeclKind>> {
         use Category::*;
         self.parse_includes()?;
-        let mut prog: Vec<Ast> = vec![];
+        let mut prog: Vec<DeclKind> = vec![];
 
         while self.accept_any(vec![Struct, Int, Char, Void]) {
             if self.token.category() == Struct
                 && self.look_ahead(1)?.category() == Identifier
                 && self.look_ahead(2)?.category() == LBrace
             {
-                prog.push(Ast::Stmt(StmtKind::Decl(self.parse_struct_decl()?)));
+                prog.push(self.parse_struct_decl()?);
             } else if self.is_fun()? {
                 let decl = {
                     let decl = self.parse_fun_decl()?;
                     if self.accept(LBrace) {
                         let block = Box::new(self.parse_block()?);
-                        Ast::Stmt(StmtKind::Decl(DeclKind::FunDefn {
+                        DeclKind::FunDefn {
                             decl: Box::new(decl),
                             block,
-                        }))
+                        }
                     } else if self.accept(Semi) {
                         self.next_token()?;
                         decl
@@ -438,13 +434,13 @@ impl Parser {
                 };
                 prog.push(decl);
             } else {
-                prog.push(Ast::Stmt(StmtKind::Decl(self.parse_var_decls()?)));
+                prog.push(self.parse_var_decls()?);
                 self.expect_any(vec![Semi])?;
             }
         }
 
         self.expect_any(vec![Eof])?;
-        Ok(Ast::Program(prog))
+        Ok(prog)
     }
 
     fn parse_stmt(&mut self) -> Result<StmtKind> {

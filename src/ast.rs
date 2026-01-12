@@ -3,40 +3,8 @@ mod expr;
 mod literal;
 mod stmt;
 mod types;
-use std::io::Write;
-
-use anyhow::Result;
-pub use decl::DeclKind;
-pub use expr::{ExprKind, OpKind};
+pub use decl::{BoundDecl, DeclKind};
+pub use expr::{BoundExpr, ExprKind, OpKind};
 pub use literal::Literal;
-use serde::Serialize;
-pub use stmt::StmtKind;
+pub use stmt::{BoundStmt, StmtKind};
 pub use types::Type;
-
-use crate::util::{Writable, Writer};
-
-#[derive(Serialize, Clone)]
-pub enum Ast {
-    Program(Vec<Ast>),
-    Stmt(StmtKind),
-    Expr(ExprKind),
-}
-
-impl Writable for Ast {
-    fn write<T: Write>(&self, writer: &mut Writer<'_, T>, eol: bool) -> Result<()> {
-        match self {
-            Ast::Program(decls) => {
-                for decl in decls {
-                    decl.write(writer, true)?;
-                }
-            }
-            Ast::Stmt(kind) => {
-                kind.write(writer, eol)?;
-            }
-            Ast::Expr(kind) => {
-                kind.write(writer, eol)?;
-            }
-        };
-        Ok(())
-    }
-}
