@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use anyhow::Result;
+use serde::Serialize;
 
 pub trait CompilerPass {
     fn num_errors(&self) -> u32;
@@ -66,5 +67,22 @@ impl<T: Write> Write for Writer<'_, T> {
 
     fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
         self.writer.write_vectored(bufs)
+    }
+}
+
+#[derive(Clone, Copy, Serialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct NodeId(pub u32);
+
+#[derive(Clone, Copy, Serialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct NodeRef(pub usize);
+
+static mut _ID: u32 = 0;
+
+impl NodeId {
+    pub fn next() -> Self {
+        unsafe {
+            _ID += 1;
+            Self(_ID)
+        }
     }
 }

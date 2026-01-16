@@ -4,7 +4,7 @@ mod literal;
 mod stmt;
 mod types;
 pub use decl::{BoundDecl, DeclKind};
-pub use expr::{BoundExpr, ExprKind, OpKind};
+pub use expr::{BoundExpr, ExprKind, Operator};
 pub use literal::Literal;
 pub use stmt::{BoundStmt, StmtKind};
 pub use types::Type;

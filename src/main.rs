@@ -1,14 +1,14 @@
 use std::{
-    io::{BufWriter, stdout},
+    io::{stdout, BufWriter},
     path::Path,
 };
 
 use anyhow::Result;
 use toyc::{
     ast::DeclKind,
+    hir::{Binder, Scope},
     lexer::{Category, Tokeniser},
     parser::Parser,
-    sem::{Binder, Scope},
     util::{CompilerPass, Writable, Writer},
 };
 

@@ -1,19 +1,19 @@
 use std::{
     collections::{HashMap, VecDeque},
-    rc::Rc,
+    default::Default,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 
 use crate::{
-    ast::{BoundDecl, BoundExpr, BoundStmt, DeclKind, ExprKind, StmtKind, Type},
-    util::CompilerPass,
+    ast::{DeclKind, ExprKind, StmtKind, Type},
+    util::{CompilerPass, NodeId, NodeRef},
 };
 
-use super::Scope;
+use super::{HIRKind, HirPool, Scope, UntypedHir};
 
 pub struct Binder {
-    unbound_functions: HashMap<String, Rc<BoundDecl>>,
+    unbound_functions: HashMap<String, NodeRef>,
     errors: u32,
 }
 
@@ -64,89 +64,99 @@ impl Binder {
     pub fn bind(
         &mut self,
         ast: Vec<DeclKind>,
-        scope: &mut Scope<Rc<BoundDecl>>,
-    ) -> Result<Vec<Rc<BoundDecl>>> {
-        let mut bound_decls = vec![];
+        scope: &mut Scope<NodeRef>,
+    ) -> Result<HirPool<UntypedHir>> {
+        let mut pool = HirPool::new();
         let ast = Self::declare_stdlib(ast);
         for decl in ast {
-            let mut bound_decl = self.bind_decl(decl, scope)?;
-            bound_decls.append(&mut bound_decl);
+            self.bind_decl(decl, scope, &mut pool)?;
         }
-        Ok(bound_decls)
+        Ok(pool)
     }
 
     fn bind_decl(
         &mut self,
         decl: DeclKind,
-        scope: &mut Scope<Rc<BoundDecl>>,
-    ) -> Result<Vec<Rc<BoundDecl>>> {
+        scope: &mut Scope<NodeRef>,
+        pool: &mut HirPool<UntypedHir>,
+    ) -> Result<Vec<NodeRef>> {
         Ok(match decl {
             DeclKind::MultiVarDecl(ty, names, exprs) => {
-                let mut decls = vec![];
+                let mut refs = vec![];
                 for i in 0..names.len() {
                     let name = names.get(i).unwrap().clone();
                     let expr = exprs.get(i).unwrap();
                     let bound_expr = if let Some(expr) = expr {
-                        Some(self.bind_expr(expr.clone(), scope)?)
+                        Some(self.bind_expr(expr.clone(), scope, pool)?)
                     } else {
                         None
                     };
-                    let bound_decl = Rc::new(BoundDecl::VarDecl {
-                        ty: ty.clone(),
-                        name: name.clone(),
-                        expr: bound_expr,
-                    });
-                    if let Some(_) = scope.put(name.clone(), bound_decl.clone()) {
+                    let decl_kind = HIRKind::VarDecl(ty.clone(), name.clone(), bound_expr);
+                    let hir_decl = UntypedHir {
+                        id: NodeId::next(),
+                        kind: decl_kind,
+                    };
+                    if let Some(_) = scope.lookup_local(&name) {
                         self.error(format!(
                             "Variable {} has already been declared in this scope.",
                             name.clone()
                         ))?;
                     }
-                    decls.push(bound_decl);
+                    let node_ref = pool.add(hir_decl);
+                    scope.put(name, node_ref);
+                    refs.push(node_ref);
                 }
-                decls
+                refs
             }
             DeclKind::VarDecl(ty, name, expr) => {
-                let bound_expr = match expr.map(|e| self.bind_expr(e, scope)) {
+                let bound_expr = match expr.map(|e| self.bind_expr(e, scope, pool)) {
                     Some(res) => Some(res?),
                     None => None,
                 };
-                let bound_decl = Rc::new(BoundDecl::VarDecl {
-                    ty,
-                    name: name.clone(),
-                    expr: bound_expr,
-                });
-                if let Some(_) = scope.put(name.clone(), bound_decl.clone()) {
+                let decl_kind = HIRKind::VarDecl(ty, name.clone(), bound_expr);
+                let hir_decl = UntypedHir {
+                    id: NodeId::next(),
+                    kind: decl_kind,
+                };
+                if let Some(_) = scope.lookup_local(&name) {
                     self.error(format!(
                         "Variable {} has already been declared in this scope.",
                         name.clone()
                     ))?;
                 }
-                vec![bound_decl]
+                let node_ref = pool.add(hir_decl);
+                scope.put(name, node_ref);
+                vec![node_ref]
             }
             DeclKind::StructTypeDecl(ty, name, fields) => {
                 let mut struct_scope = Scope::new();
-                let mut bound_fields: Vec<Rc<BoundDecl>> = vec![];
+                let mut hir_fields: Vec<NodeRef> = vec![];
                 for field in fields {
                     let bound_field = self
-                        .bind_decl(field, &mut struct_scope)?
+                        .bind_decl(field, &mut struct_scope, pool)?
                         .get(0)
                         .unwrap()
                         .clone();
-                    bound_fields.push(bound_field);
+                    hir_fields.push(bound_field);
                 }
-                let bound_decl = Rc::new(BoundDecl::StructTypeDecl(ty, name.clone(), bound_fields));
-                if let Some(_) = scope.put(format!("struct {}", name.clone()), bound_decl.clone()) {
+                let decl_kind = HIRKind::StructTypeDecl(ty, name.clone(), hir_fields);
+                let hir_decl = UntypedHir {
+                    id: NodeId::next(),
+                    kind: decl_kind,
+                };
+                if let Some(_) = scope.lookup_local(&format!("struct {}", name.clone())) {
                     self.error(format!("Repeat definition of struct {}", name.clone()))?;
                 }
-                vec![bound_decl]
+                let node_ref = pool.add(hir_decl);
+                scope.put(format!("struct {}", name), node_ref);
+                vec![node_ref]
             }
             DeclKind::FunDecl(ty, name, params) => {
                 let mut param_scope = Scope::new();
-                let mut bound_params: Vec<Rc<BoundDecl>> = vec![];
+                let mut bound_params: Vec<NodeRef> = vec![];
                 for param in params {
                     let bound_param = self
-                        .bind_decl(param, &mut param_scope)?
+                        .bind_decl(param, &mut param_scope, pool)?
                         .get(0)
                         .unwrap()
                         .clone();
@@ -160,15 +170,15 @@ impl Binder {
                 } else if scope.lookup(&name).is_some() {
                     self.error(format!("Duplicate usage of identifier {}", name.clone()))?;
                 }
-                let bound_decl = Rc::new(BoundDecl::FunDecl {
-                    ty,
-                    name: name.clone(),
-                    params: bound_params,
-                });
-                self.unbound_functions
-                    .insert(name.clone(), bound_decl.clone());
-                scope.put(name.clone(), bound_decl.clone());
-                vec![bound_decl]
+                let decl_kind = HIRKind::FunDecl(ty, name.clone(), bound_params);
+                let hir_decl = UntypedHir {
+                    id: NodeId::next(),
+                    kind: decl_kind,
+                };
+                let node_ref = pool.add(hir_decl);
+                self.unbound_functions.insert(name.clone(), node_ref);
+                scope.put(name.clone(), node_ref);
+                vec![node_ref]
             }
             DeclKind::FunDefn {
                 decl: unbound_fun_decl,
@@ -184,28 +194,22 @@ impl Binder {
                 };
 
                 let fun_decl = match self.unbound_functions.get(&fun_name) {
-                    Some(fd) => fd.clone(),
-                    None => self
-                        .bind_decl(*unbound_fun_decl.clone(), &mut scope.clone())?
+                    Some(fd) => *fd,
+                    None => *self
+                        .bind_decl(*unbound_fun_decl.clone(), &mut scope.clone(), pool)?
                         .get(0)
-                        .unwrap()
-                        .clone(),
+                        .unwrap(),
                 };
-                self.match_decl_defn(fun_decl.clone(), *unbound_fun_decl.clone())?;
-                match &*fun_decl {
-                    BoundDecl::FunDecl {
-                        ty: _,
-                        name,
-                        params,
-                    } => {
-                        self.unbound_functions.remove(name);
+                // self.match_decl_defn(fun_decl.clone(), *unbound_fun_decl.clone())?;
+                let fun_decl_kind = pool.get(fun_decl).unwrap().kind.clone();
+                self.match_decl_defn(fun_decl_kind.clone(), *unbound_fun_decl.clone())?;
+                match fun_decl_kind {
+                    HIRKind::FunDecl(_, name, params) => {
+                        self.unbound_functions.remove(&name);
                         for param in params {
-                            match &**param {
-                                BoundDecl::VarDecl {
-                                    ty: _,
-                                    name,
-                                    expr: _,
-                                } => {
+                            let param_kind = pool.get(param).unwrap().kind.clone();
+                            match param_kind {
+                                HIRKind::VarDecl(_, name, _) => {
                                     fun_scope.put(name.clone(), param.clone());
                                 }
                                 _ => self.error(format!("Function parameter is not a variable"))?,
@@ -214,115 +218,205 @@ impl Binder {
                     }
                     _ => self.error(format!("Function declaration is not a declaration"))?,
                 };
-                let bound_stmt = self.bind_stmt(*block, &mut fun_scope)?;
-                let bound_fun_defn = Rc::new(BoundDecl::FunDefn {
-                    decl: fun_decl,
-                    block: Box::new(bound_stmt),
-                });
-                vec![bound_fun_defn]
+                let stmt_ref = self.bind_stmt(*block, &mut fun_scope, pool)?;
+                let decl_kind = HIRKind::FunDefn(fun_decl, stmt_ref);
+                let hir_decl = UntypedHir {
+                    id: NodeId::next(),
+                    kind: decl_kind,
+                };
+                let node_ref = pool.add(hir_decl);
+                vec![node_ref]
             }
         })
     }
 
-    fn bind_expr(&mut self, expr: ExprKind, scope: &mut Scope<Rc<BoundDecl>>) -> Result<BoundExpr> {
+    fn bind_expr(
+        &mut self,
+        expr: ExprKind,
+        scope: &mut Scope<NodeRef>,
+        pool: &mut HirPool<UntypedHir>,
+    ) -> Result<NodeRef> {
         Ok(match expr {
-            ExprKind::InvalidExpr => BoundExpr::InvalidExpr,
-            ExprKind::Literal(l) => BoundExpr::Literal(l),
+            ExprKind::InvalidExpr => pool.add(UntypedHir {
+                id: NodeId::next(),
+                kind: HIRKind::Invalid,
+            }),
+            ExprKind::Literal(l) => pool.add(UntypedHir {
+                id: NodeId::next(),
+                kind: HIRKind::Literal(l),
+            }),
             ExprKind::VarExpr(name) => {
                 if let Some(decl) = scope.lookup(&name) {
-                    BoundExpr::VarExpr(decl.clone())
+                    let decl_kind = pool.get(*decl).unwrap().kind.clone();
+                    let expr_kind = match decl_kind {
+                        HIRKind::VarDecl(_, _, _) => HIRKind::VarExpr(*decl),
+                        _ => {
+                            self.error(format!(
+                                "Identifier {} is not a variable in this scope",
+                                name
+                            ))?;
+                            HIRKind::Invalid
+                        }
+                    };
+                    let hir_expr = UntypedHir {
+                        id: NodeId::next(),
+                        kind: expr_kind,
+                    };
+                    pool.add(hir_expr)
                 } else {
                     self.error(format!("Variable {} does not exist in this scope", name))?;
-                    BoundExpr::InvalidExpr
+                    pool.add(UntypedHir::default())
                 }
             }
-            ExprKind::BinOp(lhs, op, rhs) => BoundExpr::BinOp {
-                lhs: Box::new(self.bind_expr(*lhs, scope)?),
-                op,
-                rhs: Box::new(self.bind_expr(*rhs, scope)?),
-            },
-            ExprKind::Assign(lhs, rhs) => BoundExpr::Assign {
-                lhs: Box::new(self.bind_expr(*lhs, scope)?),
-                rhs: Box::new(self.bind_expr(*rhs, scope)?),
-            },
+            ExprKind::BinOp(lhs, op, rhs) => {
+                let expr_kind = HIRKind::BinOp(
+                    self.bind_expr(*lhs, scope, pool)?,
+                    op,
+                    self.bind_expr(*rhs, scope, pool)?,
+                );
+                let hir_expr = UntypedHir {
+                    kind: expr_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_expr)
+            }
+            ExprKind::Assign(lhs, rhs) => {
+                let expr_kind = HIRKind::Assign(
+                    self.bind_expr(*lhs, scope, pool)?,
+                    self.bind_expr(*rhs, scope, pool)?,
+                );
+                let hir_expr = UntypedHir {
+                    kind: expr_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_expr)
+            }
             ExprKind::FunCallExpr(fun_expr, args) => match *fun_expr {
                 ExprKind::VarExpr(n) => {
                     if let Some(decl) = scope.clone().lookup(&n) {
-                        let mut bound_args: Vec<BoundExpr> = vec![];
+                        let mut bound_args: Vec<NodeRef> = vec![];
                         for arg in args {
-                            bound_args.push(self.bind_expr(arg, scope)?);
+                            bound_args.push(self.bind_expr(arg, scope, pool)?);
                         }
-                        BoundExpr::FunCallExpr {
-                            defn: decl.clone(),
-                            args: bound_args,
-                        }
+                        let expr_kind = HIRKind::FunCallExpr(*decl, bound_args);
+                        let hir_expr = UntypedHir {
+                            kind: expr_kind,
+                            ..Default::default()
+                        };
+                        pool.add(hir_expr)
                     } else {
                         self.error(format!("Function {} does not exist in this scope", n))?;
-                        BoundExpr::InvalidExpr
+                        pool.add(UntypedHir::default())
                     }
                 }
                 _ => {
                     self.error(format!("Function pointers are not supported at this time"))?;
-                    BoundExpr::InvalidExpr
+                    pool.add(UntypedHir::default())
                 }
             },
-            ExprKind::TypecastExpr(ty, expr) => BoundExpr::TypecastExpr {
-                to: ty,
-                expr: Box::new(self.bind_expr(*expr, scope)?),
-            },
-            ExprKind::RefExpr(expr) => BoundExpr::RefExpr(Box::new(self.bind_expr(*expr, scope)?)),
+            ExprKind::TypecastExpr(ty, expr) => {
+                let expr_kind = HIRKind::TypecastExpr(ty, self.bind_expr(*expr, scope, pool)?);
+                let hir_expr = UntypedHir {
+                    kind: expr_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_expr)
+            }
+
+            ExprKind::RefExpr(expr) => {
+                let expr_kind = HIRKind::RefExpr(self.bind_expr(*expr, scope, pool)?);
+                let hir_expr = UntypedHir {
+                    kind: expr_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_expr)
+            }
             ExprKind::DerefExpr(expr) => {
-                BoundExpr::DerefExpr(Box::new(self.bind_expr(*expr, scope)?))
+                let expr_kind = HIRKind::DerefExpr(self.bind_expr(*expr, scope, pool)?);
+                let hir_expr = UntypedHir {
+                    kind: expr_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_expr)
             }
             ExprKind::FieldAccessExpr(struct_expr, field) => {
-                BoundExpr::FieldAccessExpr(Box::new(self.bind_expr(*struct_expr, scope)?), field)
+                let expr_kind =
+                    HIRKind::FieldAccessExpr(self.bind_expr(*struct_expr, scope, pool)?, field);
+                let hir_expr = UntypedHir {
+                    kind: expr_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_expr)
             }
-            ExprKind::ArrayAccessExpr(array_expr, i_expr) => BoundExpr::ArrayAccessExpr(
-                Box::new(self.bind_expr(*array_expr, scope)?),
-                Box::new(self.bind_expr(*i_expr, scope)?),
-            ),
+            ExprKind::ArrayAccessExpr(array_expr, i_expr) => {
+                let expr_kind = HIRKind::ArrayAccessExpr(
+                    self.bind_expr(*array_expr, scope, pool)?,
+                    self.bind_expr(*i_expr, scope, pool)?,
+                );
+                let hir_expr = UntypedHir {
+                    kind: expr_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_expr)
+            }
         })
     }
 
-    fn bind_stmt(&mut self, stmt: StmtKind, scope: &mut Scope<Rc<BoundDecl>>) -> Result<BoundStmt> {
+    fn bind_stmt(
+        &mut self,
+        stmt: StmtKind,
+        scope: &mut Scope<NodeRef>,
+        pool: &mut HirPool<UntypedHir>,
+    ) -> Result<NodeRef> {
         Ok(match stmt {
             StmtKind::Block { stmts } => {
                 let mut bound_stmts = vec![];
                 for stmt in stmts {
-                    bound_stmts.push(self.bind_stmt(stmt, scope)?);
+                    bound_stmts.push(self.bind_stmt(stmt, scope, pool)?);
                 }
-                BoundStmt::Block(bound_stmts)
+                let stmt_kind = HIRKind::Block(bound_stmts);
+                let hir_stmt = UntypedHir {
+                    kind: stmt_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_stmt)
             }
             StmtKind::While { expr, stmt } => {
-                let bound_expr = self.bind_expr(*expr, scope)?;
-                let bound_stmt = self.bind_stmt(*stmt, scope)?;
-                BoundStmt::While(Box::new(bound_expr), Box::new(bound_stmt))
+                let bound_expr = self.bind_expr(*expr, scope, pool)?;
+                let bound_stmt = self.bind_stmt(*stmt, scope, pool)?;
+                let stmt_kind = HIRKind::While(bound_expr, bound_stmt);
+                let hir_stmt = UntypedHir {
+                    kind: stmt_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_stmt)
             }
             StmtKind::If { expr, then, els } => {
-                let bound_expr = self.bind_expr(*expr, scope)?;
-                let bound_then = self.bind_stmt(*then, scope)?;
+                let bound_expr = self.bind_expr(*expr, scope, pool)?;
+                let bound_then = self.bind_stmt(*then, scope, pool)?;
                 let bound_els = match els {
-                    Some(els) => Some(Box::new(self.bind_stmt(*els, scope)?)),
+                    Some(els) => Some(self.bind_stmt(*els, scope, pool)?),
                     None => None,
                 };
-                BoundStmt::If(Box::new(bound_expr), Box::new(bound_then), bound_els)
+                let stmt_kind = HIRKind::If(bound_expr, bound_then, bound_els);
+                let hir_stmt = UntypedHir {
+                    kind: stmt_kind,
+                    ..Default::default()
+                };
+                pool.add(hir_stmt)
             }
-            StmtKind::Decl(decl) => {
-                let bound_decl = self.bind_decl(decl, scope)?.get(0).unwrap().clone();
-                BoundStmt::Decl(bound_decl)
-            }
+            StmtKind::Decl(decl) => *self.bind_decl(decl, scope, pool)?.get(0).unwrap(),
             StmtKind::Return(expr) => {
                 let bound_expr = match expr {
-                    Some(expr) => Some(Box::new(self.bind_expr(*expr, scope)?)),
+                    Some(expr) => Some(self.bind_expr(*expr, scope, pool)?),
                     None => None,
                 };
-                BoundStmt::Return(bound_expr)
+                let stmt_kind = HIRKind::Return(bound_expr);
+                pool.add(UntypedHir::new(stmt_kind))
             }
-            StmtKind::ExprStmt(expr) => {
-                BoundStmt::ExprStmt(Box::new(self.bind_expr(*expr, scope)?))
-            }
-            StmtKind::Break => BoundStmt::Break,
-            StmtKind::Continue => BoundStmt::Continue,
+            StmtKind::ExprStmt(expr) => self.bind_expr(*expr, scope, pool)?,
+            StmtKind::Break => pool.add(UntypedHir::new(HIRKind::Break)),
+            StmtKind::Continue => pool.add(UntypedHir::new(HIRKind::Continue)),
         })
     }
 
@@ -331,8 +425,8 @@ impl Binder {
         bail!("{}", err);
     }
 
-    fn match_decl_defn(&mut self, fun_decl: Rc<BoundDecl>, fun_defn: DeclKind) -> Result<()> {
-        // TODO
+    fn match_decl_defn(&mut self, fun_decl: HIRKind, fun_defn: DeclKind) -> Result<()> {
+        // TODO: match return type and parametres between decl and defn
         Ok(())
     }
 }

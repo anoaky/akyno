@@ -14,7 +14,7 @@ pub enum ExprKind {
     InvalidExpr,
     Literal(Literal),
     VarExpr(String),
-    BinOp(Box<ExprKind>, OpKind, Box<ExprKind>),
+    BinOp(Box<ExprKind>, Operator, Box<ExprKind>),
     Assign(Box<ExprKind>, Box<ExprKind>),
     FunCallExpr(Box<ExprKind>, Vec<ExprKind>),
     TypecastExpr(Type, Box<ExprKind>),
@@ -31,7 +31,7 @@ pub enum BoundExpr {
     VarExpr(Rc<BoundDecl>),
     BinOp {
         lhs: Box<BoundExpr>,
-        op: OpKind,
+        op: Operator,
         rhs: Box<BoundExpr>,
     },
     Assign {
@@ -53,7 +53,7 @@ pub enum BoundExpr {
 }
 
 #[derive(Serialize, Clone, Copy)]
-pub enum OpKind {
+pub enum Operator {
     Add,
     Sub,
     Mul,
@@ -69,9 +69,9 @@ pub enum OpKind {
     Or,
 }
 
-impl Writable for OpKind {
+impl Writable for Operator {
     fn write<T: std::io::Write>(&self, writer: &mut Writer<'_, T>, _: bool) -> anyhow::Result<()> {
-        use OpKind::*;
+        use Operator::*;
         let s = match self {
             Add => "+",
             Sub => "-",

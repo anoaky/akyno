@@ -1,9 +1,9 @@
 use std::collections::VecDeque;
 
-use anyhow::{Ok, Result, bail};
+use anyhow::{bail, Ok, Result};
 
 use crate::{
-    ast::{DeclKind, ExprKind, Literal, OpKind, StmtKind, Type},
+    ast::{DeclKind, ExprKind, Literal, Operator, StmtKind, Type},
     lexer::{Category, Token, Tokeniser},
     util::CompilerPass,
 };
@@ -261,7 +261,7 @@ impl Parser {
                 Plus => rhs,
                 Minus => ExprKind::BinOp(
                     Box::new(ExprKind::Literal(Literal::Int(0))),
-                    OpKind::Sub,
+                    Operator::Sub,
                     Box::new(rhs),
                 ),
                 Asterisk => ExprKind::DerefExpr(Box::new(rhs)),
@@ -322,19 +322,19 @@ impl Parser {
                     ExprKind::Assign(Box::new(lhs), Box::new(rhs))
                 } else {
                     let op = match op {
-                        Plus => OpKind::Add,
-                        Minus => OpKind::Sub,
-                        Asterisk => OpKind::Mul,
-                        Div => OpKind::Div,
-                        Rem => OpKind::Mod,
-                        Lt => OpKind::Lt,
-                        Le => OpKind::Le,
-                        Gt => OpKind::Gt,
-                        Ge => OpKind::Ge,
-                        Eq => OpKind::Eq,
-                        Ne => OpKind::Ne,
-                        LogOr => OpKind::Or,
-                        LogAnd => OpKind::And,
+                        Plus => Operator::Add,
+                        Minus => Operator::Sub,
+                        Asterisk => Operator::Mul,
+                        Div => Operator::Div,
+                        Rem => Operator::Mod,
+                        Lt => Operator::Lt,
+                        Le => Operator::Le,
+                        Gt => Operator::Gt,
+                        Ge => Operator::Ge,
+                        Eq => Operator::Eq,
+                        Ne => Operator::Ne,
+                        LogOr => Operator::Or,
+                        LogAnd => Operator::And,
                         _ => unreachable!(),
                     };
                     ExprKind::BinOp(Box::new(lhs), op, Box::new(rhs))

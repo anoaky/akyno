@@ -2,7 +2,7 @@ use std::{io::Write, rc::Rc};
 
 use serde::Serialize;
 
-use super::{BoundExpr, BoundStmt, types::Type};
+use super::{types::Type, BoundExpr, BoundStmt};
 use crate::{
     ast::{ExprKind, StmtKind},
     util::{Writable, Writer},
@@ -98,5 +98,24 @@ impl Writable for DeclKind {
             writeln!(writer, ";")?;
         }
         Ok(())
+    }
+}
+
+impl BoundDecl {
+    pub fn name(&self) -> String {
+        match self {
+            Self::VarDecl {
+                ty: _,
+                name,
+                expr: _,
+            }
+            | Self::StructTypeDecl(_, name, _)
+            | Self::FunDecl {
+                ty: _,
+                name,
+                params: _,
+            } => name.clone(),
+            Self::FunDefn { decl, block: _ } => decl.name(),
+        }
     }
 }
