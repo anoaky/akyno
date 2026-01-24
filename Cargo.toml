@@ -2,6 +2,7 @@
 name = "nockyc"
 version = "0.1.0-alpha.1"
 edition = "2024"
+repository = "https://github.com/anoaky/nockyc"
 
 [dependencies]
 anyhow = "1.0.100"
@@ -16,3 +17,8 @@ serde = {version ="1.0.228", features=["derive", "rc"]}
 insta = {version = "1.46.0", features = ["yaml", "glob", "ron"]}
 rstest = "0.26.1"
 tempfile = "3.24.0"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
