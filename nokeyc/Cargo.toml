@@ -1,15 +1,17 @@
 [package]
-name = "nockyc"
-version = "0.1.0-alpha.1"
+name = "nokeyc"
+version = "0.1.0-alpha.2"
 edition = "2024"
 repository = "https://github.com/anoaky/nockyc"
+description = "Compiler for nokey-lang"
 
 [dependencies]
 anyhow = "1.0.100"
 ariadne = "0.6.0"
 chumsky = { version = "0.12.0", features = ["bytes", "pratt"] }
+clap = { version = "4.5.54", features = ["derive"] }
 internment = { version = "0.8.6", features = ["arena", "serde"] }
-logos = "0.13.0"
+logos = "0.16.0"
 ron = "0.12.0"
 serde = {version ="1.0.228", features=["derive", "rc"]}
 

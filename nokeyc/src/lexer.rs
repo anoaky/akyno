@@ -8,12 +8,13 @@ use serde::Serialize;
 #[derive(Logos, Clone, Debug, PartialEq, Serialize)]
 #[logos(skip r#"\s+"#)]
 #[logos(skip r#"//.*\n"#)]
+#[logos(skip r#"/*.*\*/"#)]
 #[logos(subpattern alpha = r#"[a-zA-Z]"#)]
 #[logos(subpattern num = r#"[0-9]"#)]
 #[logos(subpattern alphanum = r#"(?&alpha)|(?&num)"#)]
 #[logos(subpattern special = r#"[\x20\x21\x23-\x26\x28-\x2F\x3A-\x40\x5B\x5D-\x60\x7B-\x7E]"#)]
 pub enum Token<'a> {
-    #[regex(r#"[_a-zA-Z][_a-zA-Z0-9]*"#)]
+    #[regex(r#"([a-zA-Z][_a-zA-Z0-9]*|[_][_a-zA-Z0-9]+)"#)]
     Identifier(&'a str),
     #[token("=")]
     Assign,

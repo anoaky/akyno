@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- next-header -->
 ## [Unreleased] - Release Date
 
+### Added
+- Full parser implementation
+- Command line interface with `clap`
+
+### Changes
+- Another rename to `nokey-lang`
+
 ### Internal
 - Setup dist CI
 - Reconfigure into workspace named `nocky`

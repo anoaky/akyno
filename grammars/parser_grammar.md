@@ -9,7 +9,7 @@ Definitions of `alpha-lower`, `alpha-upper`, and `digit` are omitted. You know w
 nat = digit , { digit } ;
 alpha = alpha-lower | alpha-upper ;
 alphanum = alpha-lower | alpha-upper | digit ;
-ident = ( "_" | alpha ) , { "_" | alphanum } ;
+ident = ( alpha ) , { "_" | alphanum } | "_" , ( "_" | alphanum ) , { "_" | alphanum };
 special-character = (* See src/lexer.rs. I'm not typing them all out *) ;
 escaped-character = "\" , ( '"' | "'" | "n" | "t" | "r" | ( "x" , 2 * digit ) ) ;
 ~~~

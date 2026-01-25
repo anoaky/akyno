@@ -7,7 +7,7 @@ use std::{
 use anyhow::Result;
 use ariadne::FileCache;
 use insta::assert_ron_snapshot;
-use nockyc::lexer::{lex, SourceFile, Token};
+use nokeyc::lexer::{lex, SourceFile, Token};
 use rstest::rstest;
 const LEXER_FAIL: u32 = 250;
 const PARSER_FAIL: u32 = 245;
@@ -55,10 +55,10 @@ fn test_lexer<'a>(src: &'a SourceFile) -> (u32, Vec<Token<'a>>) {
 //     }
 // }
 
-// #[rstest]
+#[rstest]
 fn test(
-    // #[base_dir = "tests/resources/source/"]
-    // #[files("*.nck")]
+    #[base_dir = "tests/resources/source/"]
+    #[files("*.nky")]
     path: PathBuf,
 ) -> Result<()> {
     let mut reader = BufReader::new(File::open(&path)?);
