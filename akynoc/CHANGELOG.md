@@ -13,7 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Command line interface with `clap`
 
 ### Changes
-- Another rename to `nokey-lang`
+- Another language rename to `akyno`
+
+### Fixes
+- Fix lexing of long comments
 
 ### Internal
 - Setup dist CI
@@ -27,4 +30,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic README
 
 <!-- next-url -->
-[Unreleased]: https://github.com/anoaky/nockyc/compare/v0.1.0-alpha.1...HEAD
+[Unreleased]: https://github.com/anoaky/akyno/compare/v0.1.0-alpha.1...HEAD
