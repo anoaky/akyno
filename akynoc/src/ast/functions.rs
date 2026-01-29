@@ -22,8 +22,8 @@ pub struct Param {
 #[derive(Clone, Serialize)]
 pub struct FnSig {
     pub name: Ident,
-    pub ty: Ty,
     pub params: Vec<Param>,
+    pub ty: Ty,
 }
 
 impl PartialEq for FnSig {
@@ -34,23 +34,12 @@ impl PartialEq for FnSig {
         {
             return false;
         }
-        for (p1, p2) in self.params.iter().zip(other.params.iter()) {}
-        true
-    }
-}
-
-impl FnSig {
-    pub fn new(name: String, ty: TyKind) -> Self {
-        Self {
-            name: name.into(),
-            ty: ty.into(),
-            params: vec![],
+        for (p1, p2) in self.params.iter().zip(other.params.iter()) {
+            if p1.ty != p2.ty {
+                return false;
+            }
         }
-    }
-
-    pub fn with_parameters(&mut self, params: &mut Vec<Param>) -> &mut Self {
-        self.params.append(params);
-        self
+        true
     }
 }
 
@@ -63,17 +52,6 @@ pub struct FnDecl {
 impl From<FnSig> for FnDecl {
     fn from(value: FnSig) -> Self {
         Self { sig: value }
-    }
-}
-
-impl FnDecl {
-    pub fn new(name: String, ty: TyKind) -> Self {
-        FnSig::new(name, ty).into()
-    }
-
-    pub fn with_parameters(&mut self, params: &mut Vec<Param>) -> &mut Self {
-        self.sig.params.append(params);
-        self
     }
 }
 
