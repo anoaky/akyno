@@ -1,6 +1,6 @@
 # Parser Grammar
 
-Details the language recognized by the parser, in EBNF, per ISO 14977 (more or less).
+Details the language recognized by the parser, in EBNF, per ISO 14977 (more or less). This grammar should be `LL(k)`.
 
 ## Basic definitions (see [Lexer](crate::lexer::Token))
 
@@ -9,7 +9,7 @@ Definitions of `alpha-lower`, `alpha-upper`, and `digit` are omitted. You know w
 nat = digit , { digit } ;
 alpha = alpha-lower | alpha-upper ;
 alphanum = alpha-lower | alpha-upper | digit ;
-ident = ( alpha ) , { "_" | alphanum } | "_" , ( "_" | alphanum ) , { "_" | alphanum };
+ident =  alpha , { "_" | alphanum } | "_" , ( "_" | alphanum ) , { "_" | alphanum };
 special-character = (* See src/lexer.rs. I'm not typing them all out *) ;
 escaped-character = "\" , ( '"' | "'" | "n" | "t" | "r" | ( "x" , 2 * digit ) ) ;
 ~~~
@@ -22,8 +22,7 @@ struct-field = ident , ":" , strict-type , ";" ;
 struct-decl = "struct" , ident , "{" , { struct-field } , "}" ;
 fn-params = [ ident , ":" , strict-type , { "," , ident , ":" , strict-type } ] ;
 fn-decl = ident , "(" , fn-params , ")" , ":" , strict-type , ";" ;
-fn-single-line = "=>" , stmt - block , ";" ;
-fn-defn = ident , "(" , fn-params , ")" , ":" , strict-type , ( fn-single-line | block ) ; 
+fn-defn = ident , "(" , fn-params , ")" , ":" , strict-type ,  block ; 
 ~~~
 
 ## [Statements](crate::ast::statements::Stmt)

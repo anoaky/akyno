@@ -92,14 +92,14 @@ impl Display for TyKind {
             &Self::Primitive(p) => write!(f, "{p}"),
             &Self::Void => write!(f, "void"),
             &Self::Struct(id) => write!(f, "struct {id}"),
-            &Self::Pointer(ty) => write!(f, "{}*", ty),
+            &Self::Pointer(ty) => write!(f, "(&{})", ty),
             &Self::Array(size, ty) => {
                 let mut out = vec![];
                 write!(&mut out, "{}", ty).unwrap();
                 let inner_type = String::from_utf8(out).unwrap();
                 let split_point = inner_type.find("[");
                 match split_point {
-                    None => write!(f, "{inner_type}[{size}]"),
+                    None => write!(f, "({inner_type}[{size}])"),
                     Some(i) => {
                         let (l, r) = inner_type.split_at(i);
                         write!(f, "{l}[{size}]{r}")

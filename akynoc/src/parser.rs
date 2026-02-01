@@ -3,15 +3,17 @@
 #![doc = include_str!("../../grammars/parser_grammar.md")]
 use chumsky::{
     extra::Err,
-    input::{MapExtra, Stream, ValueInput},
-    pratt::{self, *},
+    input::{Stream, ValueInput},
+    pratt::*,
     prelude::*,
 };
 
 use crate::{
     ast::{
         exprs::{Expr, ExprKind, Literal, Operator},
+        functions::{FnDecl, FnDefn, FnSig, Param},
         statements::{Stmt, StmtKind},
+        structs::{Field, StructDecl},
         types::{Ident, Primitive, Ty, TyKind},
         Item, ItemKind,
     },
@@ -19,6 +21,24 @@ use crate::{
 };
 
 type Extras<'tok, 'src> = Err<Rich<'tok, Token<'src>>>;
+
+/// Returns a parser that parses a [`SourceFile`] into a [`Vec`] of [`Items`](`Item`)
+pub fn parse<'tok, 'src: 'tok>(src: &'src SourceFile) -> Vec<Item> {
+    let inputs = get_inputs(src);
+    match item()
+        .boxed()
+        .repeated()
+        .collect::<Vec<Item>>()
+        .parse(inputs)
+        .into_result()
+    {
+        Ok(ast) => ast,
+        Err(errs) => {
+            print_errors(&src.source, errs);
+            panic!("Parsing failed")
+        }
+    }
+}
 
 pub fn print_errors<'tok, 'src: 'tok>(
     source: &ariadne::Source,
@@ -38,17 +58,6 @@ pub fn print_errors<'tok, 'src: 'tok>(
             .finish()
             .eprint(source)
             .unwrap();
-    }
-}
-
-macro_rules! impl_parser {
-    ( $n:ident, $t:ty, $( $b:tt )* ) => {
-        fn $n<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, $t, Extras<'tok, 'src>>
-        where
-            I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-        {
-            $($b)*
-        }
     }
 }
 
@@ -147,7 +156,7 @@ where
             }),
             prefix(
                 15,
-                parse_type_strict()
+                typ()
                     .boxed()
                     .delimited_by(just(Token::LPar), just(Token::RPar)),
                 |cast_to: Ty, rhs, _| ExprKind::Typecast(cast_to, Box::new(rhs)).into(),
@@ -175,185 +184,174 @@ where
     })
 }
 
-fn static_var<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Item, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    just(Token::Static)
-        .ignore_then(ident())
-        .then(
-            just(Token::Colon)
-                .ignore_then(parse_type_strict())
-                .or_not()
-                .map(|ty| ty.unwrap_or(TyKind::Infer.into())),
-        )
-        .then(just(Token::Assign).ignore_then(literal()).or_not())
-        .then_ignore(just(Token::Semi))
-        .map(|((ident, ty), value)| ItemKind::Static((ident, ty, value).into()).into())
-}
-
 fn item<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Item, Extras<'tok, 'src>>
 where
     I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
 {
-    choice((static_var(), todo()))
-}
-
-impl_parser! {
-    break_parser,
-    Stmt,
-    just(Token::Break).then(just(Token::Semi)).to(StmtKind::Break.into())
-}
-
-impl_parser! {
-    continue_parser,
-    Stmt,
-    just(Token::Continue).then(just(Token::Semi)).to(StmtKind::Continue.into())
-}
-
-fn local_var_decl<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Stmt, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    just(Token::Let)
-        .ignore_then(ident())
-        .then_ignore(just(Token::Colon))
-        .then(parse_type_strict())
+    let static_var = just(Token::Static)
+        .ignore_then(ident().boxed())
+        .then(
+            just(Token::Colon)
+                .ignore_then(typ().boxed())
+                .or_not()
+                .map(|ty| ty.unwrap_or(TyKind::Infer.into())),
+        )
+        .then(just(Token::Assign).ignore_then(literal().boxed()).or_not())
         .then_ignore(just(Token::Semi))
-        .map(|(ident, ty)| StmtKind::Local((ident, ty, None).into()).into())
-}
-
-fn local_var_defn<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Stmt, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    choice((
-        just(Token::Let)
-            .ignore_then(ident())
+        .map(|((ident, ty), value)| ItemKind::Static((ident, ty, value).into()).into());
+    let fn_params = group((ident().boxed(), just(Token::Colon).ignored(), typ().boxed()))
+        .map(|(name, _, ty)| Param { name, ty })
+        .separated_by(just(Token::Comma))
+        .collect::<Vec<Param>>();
+    let fn_sig = group((
+        ident().boxed(),
+        just(Token::LPar).ignored(),
+        fn_params,
+        just(Token::RPar).ignored(),
+        just(Token::Colon).ignored(),
+        typ().boxed(),
+    ))
+    .map(|(name, _, params, _, _, ty)| FnSig { name, params, ty });
+    let fn_decl = fn_sig
+        .clone()
+        .then_ignore(just(Token::Semi))
+        .map(|sig| ItemKind::FnDecl(FnDecl { sig }).into());
+    let fn_defn = group((
+        fn_sig.clone(),
+        just(Token::LBrace).rewind().ignored(),
+        stmt().boxed(),
+    ))
+    .map(|(sig, _, block)| {
+        ItemKind::FnDefn(FnDefn {
+            sig,
+            decl: None,
+            block,
+        })
+        .into()
+    });
+    let struct_decl = group((
+        just(Token::Struct).ignored(),
+        ident().boxed(),
+        just(Token::LBrace).ignored(),
+        ident()
             .then_ignore(just(Token::Colon))
-            .then(type_parser())
-            .then_ignore(just(Token::Assign))
-            .then(expr())
+            .then(typ().boxed())
             .then_ignore(just(Token::Semi))
-            .map(|((ident, ty), expr)| StmtKind::Local((ident, ty, Some(expr)).into()).into()),
-        just(Token::Let)
-            .ignore_then(ident())
-            .then_ignore(just(Token::Define))
-            .then(expr())
+            .map(|(name, ty)| Field { name, ty })
+            .repeated()
+            .collect::<Vec<Field>>(),
+        just(Token::RBrace).ignored(),
+    ))
+    .map(|(_, name, _, fields, _)| ItemKind::StructDecl(StructDecl { name, fields }).into());
+    choice((static_var, fn_decl, fn_defn, struct_decl))
+}
+
+fn stmt<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Stmt, Extras<'tok, 'src>>
+where
+    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
+{
+    recursive(|stmt| {
+        let block = group((
+            just(Token::LBrace).ignored(),
+            stmt.clone().repeated().collect::<Vec<_>>(),
+            just(Token::RBrace).ignored(),
+        ))
+        .map(|(_, stmts, _)| StmtKind::Block(stmts.into()).into());
+        let local_var_defn = choice((
+            just(Token::Let)
+                .ignore_then(ident().boxed())
+                .then_ignore(just(Token::Colon))
+                .then(typ().boxed())
+                .then_ignore(just(Token::Assign))
+                .then(expr().boxed())
+                .then_ignore(just(Token::Semi))
+                .map(|((ident, ty), expr)| StmtKind::Local((ident, ty, Some(expr)).into()).into()),
+            just(Token::Let)
+                .ignore_then(ident().boxed())
+                .then_ignore(just(Token::Define))
+                .then(expr().boxed())
+                .then_ignore(just(Token::Semi))
+                .map(|(ident, expr)| {
+                    StmtKind::Local((ident, TyKind::Infer.into(), Some(expr)).into()).into()
+                }),
+        ));
+        let local_var_decl = just(Token::Let)
+            .ignore_then(ident().boxed())
+            .then_ignore(just(Token::Colon))
+            .then(typ().boxed())
             .then_ignore(just(Token::Semi))
-            .map(|(ident, expr)| {
-                StmtKind::Local((ident, TyKind::Infer.into(), Some(expr)).into()).into()
-            }),
-    ))
-}
-
-fn array_type<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Vec<usize>, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    select! {
-        Token::IntLiteral(i) => i.parse::<usize>().unwrap(),
-    }
-    .delimited_by(just(Token::LBrack), just(Token::RBrack))
-    .repeated()
-    .collect()
-}
-
-fn base_type<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Ty, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    choice((
-        select! {
-            Token::Int => TyKind::Primitive(Primitive::Int).into(),Token::Char => TyKind::Primitive(Primitive::Char).into(),Token::Void => TyKind::Void.into(),Token::Underscore => TyKind::Infer.into()
-        },
-        struct_type(),
-    ))
-}
-
-fn strict_base_type<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Ty, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    choice((
-        select! {
-            Token::Int => TyKind::Primitive(Primitive::Int).into(),Token::Char => TyKind::Primitive(Primitive::Char).into(),Token::Void => TyKind::Void.into()
-        },
-        struct_type(),
-    ))
-}
-
-fn pointer_type<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, usize, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    just(Token::And).repeated().count()
-}
-
-fn struct_type<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Ty, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    just(Token::Struct).ignore_then(select! {
-        Token::Identifier(s) => TyKind::Struct(s.into()).into()
-    })
-}
-
-/// See [grammars.md](../grammars/parser_grammar.md)
-fn type_parser<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Ty, Extras<'tok, 'src>>
-where
-    I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
-{
-    let base_type = base_type().boxed();
-    let parse_type_1 = choice((
-        select! {
-            Token::IntLiteral(i) => i.parse::<usize>().unwrap(),
-        }
-        .delimited_by(just(Token::LBrack), just(Token::RBrack))
-        .repeated()
-        .collect(),
-        empty().to(vec![]),
-    ));
-    recursive(|parse_type| {
+            .map(|(ident, ty)| StmtKind::Local((ident, ty, None).into()).into());
+        let whl = group((
+            just(Token::While).ignored(),
+            just(Token::LPar).ignored(),
+            expr().boxed(),
+            just(Token::RPar).ignored(),
+            stmt.clone(),
+        ))
+        .map(|(_, _, expr, _, stmt)| StmtKind::While(expr, Box::new(stmt)).into());
+        let if_parser = group((
+            just(Token::If).ignored(),
+            just(Token::LPar).ignored(),
+            expr().boxed(),
+            just(Token::RPar).ignored(),
+            stmt.clone(),
+            just(Token::Else).ignore_then(stmt.clone()).or_not(),
+        ))
+        .map(|(_, _, expr, _, then, els)| match els {
+            Some(els) => StmtKind::If(expr, Box::new(then), Some(Box::new(els))).into(),
+            None => StmtKind::If(expr, Box::new(then), None).into(),
+        });
+        let expr_stmt = expr().boxed().map(|exp| StmtKind::Expr(exp).into());
+        let brk = group((just(Token::Break), just(Token::Semi))).to(StmtKind::Break.into());
+        let cnt = group((just(Token::Continue), just(Token::Semi))).to(StmtKind::Continue.into());
         choice((
-            base_type.then(parse_type_1.clone()).map(make_array_type),
-            just(Token::And)
-                .then(parse_type.clone())
-                .map(|(_, ty)| TyKind::Pointer(ty).into()),
-            parse_type
-                .delimited_by(just(Token::LPar), just(Token::RPar))
-                .then(parse_type_1.clone())
-                .map(make_array_type),
+            block,
+            local_var_decl,
+            local_var_defn,
+            whl,
+            if_parser,
+            expr_stmt,
+            brk,
+            cnt,
         ))
     })
 }
 
-fn parse_type_strict<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Ty, Extras<'tok, 'src>>
+fn typ<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Ty, Extras<'tok, 'src>>
 where
     I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
 {
-    let base_type = strict_base_type().boxed();
-    let parse_type_1 = choice((
-        select! {
-            Token::IntLiteral(i) => i.parse::<usize>().unwrap(),
-        }
-        .delimited_by(just(Token::LBrack), just(Token::RBrack))
-        .repeated()
-        .collect(),
-        empty().to(vec![]),
-    ));
-    recursive(|parse_type| {
+    recursive(|typ| {
+        let struct_type = just(Token::Struct).ignore_then(select! {
+            Token::Identifier(s) => TyKind::Struct(s.into()).into()
+        });
+        let base_type = choice((
+            select! {
+                Token::Int => TyKind::Primitive(Primitive::Int).into(),Token::Char => TyKind::Primitive(Primitive::Char).into(),Token::Void => TyKind::Void.into(),Token::Underscore => TyKind::Infer.into(),
+            },
+            struct_type,
+        ));
+        let ptr_type = just(Token::And)
+            .ignore_then(typ.clone().memoized())
+            .map(|ty| TyKind::Pointer(ty).into());
+        let arr_type = typ
+            .clone().memoized()
+            .then(
+                select! {
+                    Token::IntLiteral(i) => i.parse::<usize>().unwrap()
+                }
+                .delimited_by(just(Token::LBrack), just(Token::RBrack))
+                .repeated()
+                .collect::<Vec<_>>(),
+            )
+            .map(make_array_type);
         choice((
-            base_type.then(parse_type_1.clone()).map(make_array_type),
-            just(Token::And)
-                .then(parse_type.clone())
-                .map(|(_, ty)| TyKind::Pointer(ty).into()),
-            parse_type
-                .delimited_by(just(Token::LPar), just(Token::RPar))
-                .then(parse_type_1.clone())
-                .map(make_array_type),
+            arr_type,
+            ptr_type,
+            base_type,
+            typ.memoized().delimited_by(just(Token::LPar), just(Token::RPar)),
         ))
-    })
+    }).memoized()
 }
 
 fn make_array_type((ty, sizes): (Ty, Vec<usize>)) -> Ty {
@@ -362,14 +360,6 @@ fn make_array_type((ty, sizes): (Ty, Vec<usize>)) -> Ty {
     while !sizes.is_empty() {
         let size = sizes.pop().unwrap();
         ty = TyKind::Array(size, ty).into();
-    }
-    ty
-}
-
-fn make_ptr_type(ty: Ty, indir: usize) -> Ty {
-    let mut ty = ty;
-    for _ in 0..indir {
-        ty = TyKind::Pointer(ty).into();
     }
     ty
 }
@@ -384,94 +374,19 @@ fn get_inputs<'tok, 'src: 'tok>(
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Display, io::Write};
+    use std::io::Write;
 
     use anyhow::{bail, Result};
     use ariadne::FileCache;
     use chumsky::Parser;
-    use internment::Intern;
     use rstest::{fixture, rstest};
-    use serde::Serialize;
     use tempfile::NamedTempFile;
 
-    use crate::{
-        ast::types::{Primitive, Ty, TyKind},
-        lexer::SourceFile,
-        parser::base_type,
-    };
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Hash)]
-    enum TyTestKind {
-        Int,
-        Char,
-        Void,
-        Struct,
-        Pointer,
-        Array,
-        Infer,
-    }
-
-    impl Display for TyTestKind {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let s = match self {
-                Self::Int => "int",
-                Self::Char => "char",
-                Self::Void => "void",
-                Self::Struct => "struct",
-                Self::Pointer => "pointer",
-                Self::Array => "array",
-                Self::Infer => "infer",
-            };
-            write!(f, "{}", s)
-        }
-    }
-
-    impl TyTestKind {
-        pub fn equals(&self, other: &TyKind) -> bool {
-            match (self, other) {
-                (Self::Int, TyKind::Primitive(Primitive::Int))
-                | (Self::Char, TyKind::Primitive(Primitive::Char))
-                | (Self::Void, TyKind::Void)
-                | (Self::Struct, TyKind::Struct(_))
-                | (Self::Pointer, TyKind::Pointer(_))
-                | (Self::Array, TyKind::Array(_, _))
-                | (Self::Infer, TyKind::Infer) => true,
-                (_, _) => false,
-            }
-        }
-    }
+    use crate::lexer::SourceFile;
 
     #[fixture]
     fn cache() -> FileCache {
         FileCache::default()
-    }
-
-    fn match_kinds<const N: usize>(kinds: [TyTestKind; N], entry_ty: Ty) {
-        let mut cur_kind = *entry_ty.kind;
-        for i in 0..N {
-            if !kinds[i].equals(&cur_kind) {
-                panic!("Mismatching kinds[{i}]: {0} != {cur_kind}", kinds[i])
-            }
-            match cur_kind {
-                TyKind::Primitive(_) | TyKind::Void | TyKind::Struct(_) | TyKind::Infer => {
-                    if i == N - 1 {
-                        return;
-                    } else {
-                        panic!("Unexpected end of chain with {cur_kind}");
-                    }
-                }
-                TyKind::Pointer(next_ty) | TyKind::Array(_, next_ty) => {
-                    if i == N - 1 {
-                        panic!(
-                            "Unexpected chain continues from {cur_kind} with {0}",
-                            *next_ty.kind
-                        );
-                    } else {
-                        cur_kind = *next_ty.kind;
-                    }
-                }
-            }
-        }
     }
 
     fn src(s: String, cache: FileCache) -> SourceFile {
@@ -502,22 +417,19 @@ mod tests {
     }
 
     #[rstest]
-    #[case::infer("_", [TyTestKind::Infer])]
-    #[case::int("int", [TyTestKind::Int])]
-    #[case::char("char", [TyTestKind::Char])]
-    #[case::int_ptr("&char", [TyTestKind::Pointer, TyTestKind::Char])]
-    #[case::int_arr("char[4]", [TyTestKind::Array, TyTestKind::Char])]
-    #[case::ptr_arr("(&int)[10]", [TyTestKind::Array, TyTestKind::Pointer, TyTestKind::Int])]
-    #[case::arr_ptr("&int[10]", [TyTestKind::Pointer, TyTestKind::Array, TyTestKind::Int])]
-    fn test_type<const N: usize>(
-        #[case] input: String,
-        #[case] expected: [TyTestKind; N],
-        cache: FileCache,
-    ) {
+    #[case::infer("_", "_")]
+    #[case::int("int", "int")]
+    #[case::char("char", "char")]
+    #[case::int_ptr("&char", "(&char)")]
+    #[case::int_arr("char[4]", "(char[4])")]
+    #[case::ptr_arr("(&int)[10]", "((&int)[10])")]
+    #[case::arr_ptr("&int[10]", "(&(int[10]))")]
+    #[case::multidim_arr("int[4][5]", "(int[4][5])")]
+    fn test_type(#[case] input: String, #[case] expected: String, cache: FileCache) {
         let src_file = src(input, cache);
         let inputs = super::get_inputs(&src_file);
-        match super::type_parser().parse(inputs).into_result() {
-            Ok(recovered) => match_kinds(expected, recovered),
+        match super::typ().parse(inputs).into_result() {
+            Ok(recovered) => assert_eq!(recovered.to_string(), expected),
             Err(errs) => {
                 super::print_errors(&src_file.source, errs);
                 panic!("Parsing error");
