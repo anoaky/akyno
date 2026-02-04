@@ -5,7 +5,7 @@ snapshot_kind: text
 ---
 [
   Item(
-    id: NodeId(16),
+    id: "[nodeid]",
     kind: FnDefn(FnDefn(
       sig: FnSig(
         name: Ident(
@@ -17,7 +17,7 @@ snapshot_kind: text
               name: "x",
             ),
             ty: Ty(
-              id: NodeId(8),
+              id: "[nodeid]",
               kind: Primitive(Int),
             ),
           ),
@@ -26,32 +26,32 @@ snapshot_kind: text
               name: "y",
             ),
             ty: Ty(
-              id: NodeId(9),
+              id: "[nodeid]",
               kind: Primitive(Int),
             ),
           ),
         ],
         ty: Ty(
-          id: NodeId(10),
+          id: "[nodeid]",
           kind: Primitive(Int),
         ),
       ),
       decl: None,
       block: Stmt(
-        id: NodeId(15),
+        id: "[nodeid]",
         kind: Block(Block(
           stmts: [
             Stmt(
-              id: NodeId(14),
+              id: "[nodeid]",
               kind: Expr(Expr(
-                id: NodeId(13),
+                id: "[nodeid]",
                 kind: BinOp(Expr(
-                  id: NodeId(11),
+                  id: "[nodeid]",
                   kind: Ident(Ident(
                     name: "x",
                   )),
                 ), Add, Expr(
-                  id: NodeId(12),
+                  id: "[nodeid]",
                   kind: Ident(Ident(
                     name: "y",
                   )),
@@ -64,7 +64,7 @@ snapshot_kind: text
     )),
   ),
   Item(
-    id: NodeId(31),
+    id: "[nodeid]",
     kind: FnDefn(FnDefn(
       sig: FnSig(
         name: Ident(
@@ -72,27 +72,27 @@ snapshot_kind: text
         ),
         params: [],
         ty: Ty(
-          id: NodeId(18),
+          id: "[nodeid]",
           kind: Void,
         ),
       ),
       decl: None,
       block: Stmt(
-        id: NodeId(30),
+        id: "[nodeid]",
         kind: Block(Block(
           stmts: [
             Stmt(
-              id: NodeId(21),
+              id: "[nodeid]",
               kind: Local(Local(
                 name: Ident(
                   name: "x",
                 ),
                 ty: Ty(
-                  id: NodeId(20),
+                  id: "[nodeid]",
                   kind: Infer,
                 ),
                 value: Some(Expr(
-                  id: NodeId(19),
+                  id: "[nodeid]",
                   kind: Literal(Literal(
                     value: Int(1),
                   )),
@@ -100,17 +100,17 @@ snapshot_kind: text
               )),
             ),
             Stmt(
-              id: NodeId(24),
+              id: "[nodeid]",
               kind: Local(Local(
                 name: Ident(
                   name: "y",
                 ),
                 ty: Ty(
-                  id: NodeId(23),
+                  id: "[nodeid]",
                   kind: Infer,
                 ),
                 value: Some(Expr(
-                  id: NodeId(22),
+                  id: "[nodeid]",
                   kind: Literal(Literal(
                     value: Int(2),
                   )),
@@ -118,25 +118,25 @@ snapshot_kind: text
               )),
             ),
             Stmt(
-              id: NodeId(29),
+              id: "[nodeid]",
               kind: Expr(Expr(
-                id: NodeId(28),
+                id: "[nodeid]",
                 kind: CallFn(CallFn(
                   name: Expr(
-                    id: NodeId(25),
+                    id: "[nodeid]",
                     kind: Ident(Ident(
                       name: "add",
                     )),
                   ),
                   args: [
                     Expr(
-                      id: NodeId(26),
+                      id: "[nodeid]",
                       kind: Ident(Ident(
                         name: "x",
                       )),
                     ),
                     Expr(
-                      id: NodeId(27),
+                      id: "[nodeid]",
                       kind: Ident(Ident(
                         name: "y",
                       )),

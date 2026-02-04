@@ -44,7 +44,7 @@ fn test_parser<'a>(src: &'a SourceFile) -> (u32, Vec<Item>) {
     let parser = parser::parser();
     match parser.parse(token_stream).into_result() {
         Ok(ast) => (PASS, ast),
-        Err(errs) => (PARSER_FAIL, vec![]),
+        Err(_) => (PARSER_FAIL, vec![]),
     }
 }
 
@@ -106,7 +106,9 @@ fn test(
         assert_eq!(parser_expected, parser_actual);
         if parser_expected == PASS {
             set_snapshot_suffix!("parser");
-            assert_ron_snapshot!(path.file_stem().unwrap().to_str().unwrap(), ast);
+            assert_ron_snapshot!(path.file_stem().unwrap().to_str().unwrap(), ast, {
+                ".**.id" => "[nodeid]"
+            });
         }
     }
     Ok(())
