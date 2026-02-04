@@ -7,7 +7,7 @@ use serde::Serialize;
 
 #[derive(Logos, Clone, Debug, PartialEq, Serialize)]
 #[logos(skip r#"\s+"#)]
-#[logos(skip r#"//.*"#)]
+#[logos(skip r#"//([^\n]+)?\n?"#)]
 #[logos(skip r#"/\*[^*]*\*+([^/*][^*]*\*+)*/"#)]
 #[logos(subpattern alpha = r#"[a-zA-Z]"#)]
 #[logos(subpattern num = r#"[0-9]"#)]
@@ -51,6 +51,8 @@ pub enum Token<'a> {
     Else,
     #[token("while")]
     While,
+    #[token("for")]
+    For,
     #[token("return")]
     Return,
     #[token("struct")]
@@ -128,6 +130,7 @@ impl<'a> Display for Token<'a> {
             If => write!(f, "if"),
             Else => write!(f, "else"),
             While => write!(f, "while"),
+            For => write!(f, "for"),
             Return => write!(f, "return"),
             Struct => write!(f, "struct"),
             Continue => write!(f, "continue"),

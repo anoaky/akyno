@@ -7,6 +7,7 @@ Details the language recognized by the parser, in EBNF, per ISO 14977 (more or l
 Definitions of `alpha-lower`, `alpha-upper`, and `digit` are omitted. You know what uppercase letters, lowercase letters, and digits are, I hope.
 ~~~text
 nat = digit , { digit } ;
+int = [ "-" ] , nat ;
 alpha = alpha-lower | alpha-upper ;
 alphanum = alpha-lower | alpha-upper | digit ;
 ident =  alpha , { "_" | alphanum } | "_" , ( "_" | alphanum ) , { "_" | alphanum };
@@ -33,10 +34,16 @@ local-var-decl = "let" , ident , ":" , strict-type , ";" ;
 local-var-defn = "let" , ident , ":" , type , "=" , expr , ";" ;
 local-var-quick-defn = "let" , ident , ":=" , expr , ";" ;
 while = "while" , "(" , expr , ")" , stmt ;
+for = "for" , "(" , range_pattern , ")" , stmt ;
 if = "if" , "(" , expr , ")" , stmt , [ "else" , stmt ] ;
 expr-stmt = expr , [ ";" ] ;
 continue = "continue;" ;
 break = "break;" ;
+~~~
+
+## Patterns
+~~~text
+range_pattern = ident , ":" , ( "[" | "(" ) , int, "," , int , ( "]" | ")" ) ;
 ~~~
 
 ## [Types](crate::ast::types::Ty)

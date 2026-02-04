@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::ast::{
     statements::Stmt,
-    types::{Ident, Ty, TyKind},
+    types::{Ident, Ty},
 };
 
 /// Encodes a single parameter in a [`FnSig`].

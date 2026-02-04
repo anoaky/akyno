@@ -5,6 +5,7 @@ use serde::Serialize;
 
 pub mod exprs;
 pub mod functions;
+pub mod pattern;
 pub mod statements;
 pub mod structs;
 pub mod types;

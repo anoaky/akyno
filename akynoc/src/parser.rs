@@ -12,6 +12,7 @@ use crate::{
     ast::{
         exprs::{Expr, ExprKind, Literal, Operator},
         functions::{FnDecl, FnDefn, FnSig, Param},
+        pattern::Range,
         statements::{Stmt, StmtKind},
         structs::{Field, StructDecl},
         types::{Ident, Primitive, Ty, TyKind},
@@ -265,6 +266,29 @@ fn stmt<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Stmt, Extras<'tok, 'src>>
 where
     I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
 {
+    let int_parser = just(Token::Minus)
+        .or_not()
+        .then(select! {Token::IntLiteral(i) => i.parse::<i32>().unwrap()})
+        .map(|(minus, i)| match minus {
+            Some(_) => -i,
+            None => i,
+        });
+    let range_pattern = group((
+        ident().boxed().then_ignore(just(Token::Colon)),
+        just(Token::LBrack).or(just(Token::LPar)),
+        int_parser.clone(),
+        just(Token::Comma).ignore_then(int_parser.clone()),
+        just(Token::RBrack).or(just(Token::RPar)),
+    ))
+    .map(
+        |(id, open_delim, start, end, close_delim)| match (open_delim, close_delim) {
+            (Token::LBrack, Token::RBrack) => (id, Range::Inclusive(start, end)).into(),
+            (Token::LPar, Token::RPar) => (id, Range::Exclusive(start, end)).into(),
+            (Token::LPar, Token::RBrack) => (id, Range::ExclusiveInclusive(start, end)).into(),
+            (Token::LBrack, Token::RPar) => (id, Range::InclusiveExclusive(start, end)).into(),
+            _ => unreachable!(),
+        },
+    );
     recursive(|stmt| {
         let block = group((
             just(Token::LBrace).ignored(),
@@ -296,6 +320,13 @@ where
             .then(typ().boxed())
             .then_ignore(just(Token::Semi))
             .map(|(ident, ty)| StmtKind::Local((ident, ty, None).into()).into());
+        let for_parser = group((
+            just(Token::For)
+                .ignore_then(just(Token::LPar))
+                .ignore_then(range_pattern.clone()),
+            just(Token::RPar).ignore_then(stmt.clone()),
+        ))
+        .map(|(pat, statement)| StmtKind::For(pat, Box::new(statement)).into());
         let whl = group((
             just(Token::While).ignored(),
             just(Token::LPar).ignored(),
@@ -332,6 +363,7 @@ where
             block,
             local_var_decl,
             local_var_defn,
+            for_parser,
             whl,
             if_parser,
             ret,

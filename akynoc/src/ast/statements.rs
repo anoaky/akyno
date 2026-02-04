@@ -4,6 +4,7 @@ use serde::Serialize;
 use crate::{
     ast::{
         exprs::Expr,
+        pattern::Pattern,
         types::{Ident, Ty},
     },
     util::NodeId,
@@ -28,6 +29,7 @@ pub struct Local {
 pub enum StmtKind {
     Block(Block),
     Local(Local),
+    For(Pattern, Box<Stmt>),
     While(Expr, Box<Stmt>),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Expr(Expr),
