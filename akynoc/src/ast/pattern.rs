@@ -1,6 +1,9 @@
 use serde::Serialize;
 
-use crate::{ast::types::Ident, util::NodeId};
+use crate::{
+    ast::{exprs::Expr, types::Ident},
+    util::NodeId,
+};
 
 #[derive(Clone, Serialize)]
 pub struct Pattern {
@@ -13,12 +16,12 @@ pub enum PatternKind {
     RangePattern(Ident, Range),
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Serialize)]
 pub enum Range {
-    Exclusive(i32, i32),
-    Inclusive(i32, i32),
-    ExclusiveInclusive(i32, i32),
-    InclusiveExclusive(i32, i32),
+    Exclusive(Expr, Expr),
+    Inclusive(Expr, Expr),
+    ExclusiveInclusive(Expr, Expr),
+    InclusiveExclusive(Expr, Expr),
 }
 
 impl From<(Ident, Range)> for Pattern {

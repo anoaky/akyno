@@ -266,18 +266,11 @@ fn stmt<'tok, 'src: 'tok, I>() -> impl Parser<'tok, I, Stmt, Extras<'tok, 'src>>
 where
     I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
 {
-    let int_parser = just(Token::Minus)
-        .or_not()
-        .then(select! {Token::IntLiteral(i) => i.parse::<i32>().unwrap()})
-        .map(|(minus, i)| match minus {
-            Some(_) => -i,
-            None => i,
-        });
     let range_pattern = group((
         ident().boxed().then_ignore(just(Token::Colon)),
         just(Token::LBrack).or(just(Token::LPar)),
-        int_parser.clone(),
-        just(Token::Comma).ignore_then(int_parser.clone()),
+        expr().boxed(),
+        just(Token::Semi).ignore_then(expr().boxed()),
         just(Token::RBrack).or(just(Token::RPar)),
     ))
     .map(
