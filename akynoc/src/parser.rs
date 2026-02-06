@@ -388,8 +388,7 @@ where
 fn make_array_type((ty, sizes): (Ty, Vec<usize>)) -> Ty {
     let mut ty = ty;
     let mut sizes = sizes.clone();
-    while !sizes.is_empty() {
-        let size = sizes.pop().unwrap();
+    while let Some(size) = sizes.pop() {
         ty = TyKind::Array(size, ty).into();
     }
     ty

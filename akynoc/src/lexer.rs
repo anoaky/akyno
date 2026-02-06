@@ -209,20 +209,21 @@ pub fn print_errors<'src, I>(src: &'src SourceFile, token_iter: I)
 where
     I: std::iter::Iterator<Item = (Token<'src>, SimpleSpan)>,
 {
-    token_iter.for_each(|(tok, span)| match tok {
-        Token::Invalid => Report::build(ariadne::ReportKind::Error, (&src.name, span.into_range()))
-            .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
-            .with_code(250)
-            .with_message("Lexing error")
-            .with_label(
-                ariadne::Label::new((&src.name, span.into_range()))
-                    .with_message("Unrecognized character")
-                    .with_color(ariadne::Color::Red),
-            )
-            .finish()
-            .eprint((&src.name, &src.source))
-            .unwrap(),
-        _ => (),
+    token_iter.for_each(|(tok, span)| {
+        if tok == Token::Invalid {
+            Report::build(ariadne::ReportKind::Error, (&src.name, span.into_range()))
+                .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                .with_code(250)
+                .with_message("Lexing error")
+                .with_label(
+                    ariadne::Label::new((&src.name, span.into_range()))
+                        .with_message("Unrecognized character")
+                        .with_color(ariadne::Color::Red),
+                )
+                .finish()
+                .eprint((&src.name, &src.source))
+                .unwrap();
+        }
     });
 }
 
