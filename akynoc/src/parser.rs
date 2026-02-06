@@ -11,7 +11,7 @@ use crate::{
     ast::{
         exprs::{Expr, ExprKind, Literal, Operator},
         functions::{FnDecl, FnDefn, FnSig, Param},
-        pattern::Range,
+        pattern::PatternKind,
         statements::{Stmt, StmtKind},
         structs::{Field, StructDecl},
         types::{Ident, Primitive, Ty, TyKind},
@@ -248,21 +248,16 @@ where
     I: ValueInput<'tok, Span = SimpleSpan, Token = Token<'src>>,
 {
     let range_pattern = group((
-        ident().boxed().then_ignore(just(Token::Colon)),
-        just(Token::LBrack).or(just(Token::LPar)),
+        ident()
+            .boxed()
+            .then_ignore(just(Token::Colon))
+            .then_ignore(just(Token::LBrack)),
         expr().boxed(),
-        just(Token::Semi).ignore_then(expr().boxed()),
-        just(Token::RBrack).or(just(Token::RPar)),
+        just(Token::Semi)
+            .ignore_then(expr().boxed())
+            .then_ignore(just(Token::RBrack)),
     ))
-    .map(
-        |(id, open_delim, start, end, close_delim)| match (open_delim, close_delim) {
-            (Token::LBrack, Token::RBrack) => (id, Range::Inclusive(start, end)).into(),
-            (Token::LPar, Token::RPar) => (id, Range::Exclusive(start, end)).into(),
-            (Token::LPar, Token::RBrack) => (id, Range::ExclusiveInclusive(start, end)).into(),
-            (Token::LBrack, Token::RPar) => (id, Range::InclusiveExclusive(start, end)).into(),
-            _ => unreachable!(),
-        },
-    );
+    .map(|(id, start, end)| PatternKind::RangePattern(id, start, end).into());
     recursive(|stmt| {
         let block = group((
             just(Token::LBrace).ignored(),

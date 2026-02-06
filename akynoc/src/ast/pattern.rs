@@ -13,22 +13,14 @@ pub struct Pattern {
 
 #[derive(Clone, Serialize)]
 pub enum PatternKind {
-    RangePattern(Ident, Range),
+    RangePattern(Ident, Expr, Expr),
 }
 
-#[derive(Clone, Serialize)]
-pub enum Range {
-    Exclusive(Expr, Expr),
-    Inclusive(Expr, Expr),
-    ExclusiveInclusive(Expr, Expr),
-    InclusiveExclusive(Expr, Expr),
-}
-
-impl From<(Ident, Range)> for Pattern {
-    fn from((id, range): (Ident, Range)) -> Self {
+impl From<PatternKind> for Pattern {
+    fn from(value: PatternKind) -> Self {
         Self {
             id: NodeId::next(),
-            kind: PatternKind::RangePattern(id, range),
+            kind: value,
         }
     }
 }
