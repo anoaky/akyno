@@ -103,6 +103,8 @@ pub enum Token<'a> {
     FatArrow,
     #[token("let")]
     Let,
+    #[token("fn")]
+    Fn,
     #[token(":=")]
     Define,
     Invalid,
@@ -156,6 +158,7 @@ impl<'a> Display for Token<'a> {
             Dot => write!(f, "."),
             FatArrow => write!(f, "=>"),
             Let => write!(f, "let"),
+            Fn => write!(f, "fn"),
             Define => write!(f, ":="),
             Invalid => write!(f, "INVALID"),
         }
