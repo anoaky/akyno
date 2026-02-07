@@ -1,65 +1,48 @@
-//! Constructs for encoding types.
-use std::fmt::Display;
+use std::{fmt::Display, hash::Hash};
 
 use internment::Intern;
 use serde::Serialize;
 
-use crate::util::NodeId;
+use crate::{ast::patterns::Ident, util::NodeId};
 
-/// Encodes an identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Hash)]
-pub struct Ident {
-    pub name: Intern<String>,
-}
-
-/// Encodes the two primitive types: `int` and `char`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Hash)]
 pub enum Primitive {
+    Unit,
     Int,
     Char,
 }
 
-/// Encodes information for [`Ty`].
-///
-/// Since all [`TyKind`] are interned, two different [`Items`](super::Item) with equivalent type
-/// will have the exact same [`TyKind`].
-#[derive(Debug, Clone, Copy, Eq, Serialize, Hash)]
+#[derive(Debug, Clone, Eq, Serialize)]
 pub enum TyKind {
     Primitive(Primitive),
-    Void,
     Struct(Ident),
     Pointer(Ty),
     Array(usize, Ty),
+    Tuple(Vec<Ty>),
     Infer,
 }
 
-/// Encodes a single type.
-#[derive(Debug, Clone, Copy, Eq, Serialize, Hash)]
+#[derive(Debug, Clone, Eq, Serialize)]
 pub struct Ty {
     pub id: NodeId,
     pub kind: Intern<TyKind>,
 }
 
-impl From<TyKind> for Ty {
-    fn from(value: TyKind) -> Self {
-        Self {
-            id: NodeId::next(),
-            kind: Intern::new(value),
-        }
-    }
-}
-
 impl PartialEq for TyKind {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (TyKind::Primitive(p1), TyKind::Primitive(p2)) => *p1 == *p2,
-            (TyKind::Void, TyKind::Void) => true,
-            (TyKind::Struct(s1), TyKind::Struct(s2)) => *s1 == *s2,
-            (TyKind::Pointer(t1), TyKind::Pointer(t2)) => *t1 == *t2,
-            (TyKind::Array(s1, t1), TyKind::Array(s2, t2)) => *s1 == *s2 && *t1 == *t2,
-            #[cfg(test)]
-            (TyKind::Infer, TyKind::Infer) => true,
-            (_, _) => false,
+            (Self::Primitive(p1), Self::Primitive(p2)) => *p1 == *p2,
+            (Self::Struct(id1), Self::Struct(id2)) => *id1 == *id2,
+            (Self::Pointer(t1), Self::Pointer(t2)) => *t1 == *t2,
+            (Self::Array(s1, t1), Self::Array(s2, t2)) => *s1 == *s2 && *t1 == *t2,
+            (Self::Tuple(t1), Self::Tuple(t2)) => {
+                if t1.len() != t2.len() {
+                    false
+                } else {
+                    t1.iter().zip(t2).all(|(t1, t2)| *t1 == *t2)
+                }
+            }
+            _ => false,
         }
     }
 }
@@ -70,30 +53,50 @@ impl PartialEq for Ty {
     }
 }
 
-impl Display for Ident {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
+impl Hash for TyKind {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Primitive(p) => p.hash(state),
+            Self::Struct(id) => id.hash(state),
+            Self::Pointer(ty) => {
+                "*".hash(state);
+                ty.hash(state);
+            }
+            Self::Array(size, ty) => {
+                size.hash(state);
+                ty.hash(state);
+            }
+            Self::Tuple(tys) => {
+                tys.hash(state);
+            }
+            Self::Infer => "infer".hash(state),
+        }
+    }
+}
+
+impl Hash for Ty {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.kind.hash(state);
     }
 }
 
 impl Display for Primitive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Primitive::Unit => write!(f, "()"),
             Primitive::Int => write!(f, "int"),
             Primitive::Char => write!(f, "char"),
         }
     }
 }
-use std::io::Write;
-
 impl Display for TyKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::io::Write;
         match self {
-            &Self::Primitive(p) => write!(f, "{p}"),
-            &Self::Void => write!(f, "void"),
-            &Self::Struct(id) => write!(f, "struct {id}"),
-            &Self::Pointer(ty) => write!(f, "(&{})", ty),
-            &Self::Array(size, ty) => {
+            Self::Primitive(p) => write!(f, "{p}"),
+            Self::Struct(id) => write!(f, "struct {id}"),
+            Self::Pointer(ty) => write!(f, "(&{})", ty),
+            Self::Array(size, ty) => {
                 let mut out = vec![];
                 write!(&mut out, "{}", ty).unwrap();
                 let inner_type = String::from_utf8(out).unwrap();
@@ -106,7 +109,16 @@ impl Display for TyKind {
                     }
                 }
             }
-            &Self::Infer => write!(f, "_"),
+            Self::Tuple(tys) => {
+                write!(f, "(")?;
+                let mut delim = "";
+                for ty in tys {
+                    write!(f, "{}{}", delim, ty)?;
+                    delim = ", ";
+                }
+                write!(f, ")")
+            }
+            Self::Infer => write!(f, "_"),
         }
     }
 }
@@ -117,18 +129,11 @@ impl Display for Ty {
     }
 }
 
-impl From<&str> for Ident {
-    fn from(value: &str) -> Self {
+impl From<TyKind> for Ty {
+    fn from(value: TyKind) -> Self {
         Self {
-            name: Intern::from_ref(value),
-        }
-    }
-}
-
-impl From<String> for Ident {
-    fn from(value: String) -> Self {
-        Self {
-            name: Intern::new(value),
+            id: NodeId::next(),
+            kind: Intern::new(value),
         }
     }
 }
