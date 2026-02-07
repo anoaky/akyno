@@ -128,3 +128,12 @@ impl Display for Ty {
         write!(f, "{}", self.kind)
     }
 }
+
+impl From<TyKind> for Ty {
+    fn from(value: TyKind) -> Self {
+        Self {
+            id: NodeId::next(),
+            kind: Intern::new(value),
+        }
+    }
+}

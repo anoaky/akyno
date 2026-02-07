@@ -1,1 +1,57 @@
+use internment::Intern;
+use serde::Serialize;
 
+use crate::{
+    ast::{
+        patterns::Ident,
+        types::{Ty, TyKind},
+    },
+    util::NodeId,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Hash)]
+pub enum Literal {
+    Int(i32),
+    Char(char),
+    String(Intern<String>),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FnParam {
+    name: Ident,
+    ty: Ty,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FnSig {
+    name: Ident,
+    params: Vec<FnParam>,
+    ty: Ty,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum ExprKind {
+    Literal(Literal),
+    Block(Vec<Expr>),
+    Fn(FnSig, Box<Expr>),
+    If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
+    While(Box<Expr>, Box<Expr>),
+    Call(Ident, Vec<Expr>),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Expr {
+    pub id: NodeId,
+    pub kind: ExprKind,
+    pub ty: Ty,
+}
+
+impl From<ExprKind> for Expr {
+    fn from(value: ExprKind) -> Self {
+        Self {
+            id: NodeId::next(),
+            kind: value,
+            ty: TyKind::Infer.into(),
+        }
+    }
+}
