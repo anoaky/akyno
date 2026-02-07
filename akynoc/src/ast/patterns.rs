@@ -54,3 +54,20 @@ impl PartialEq for Pattern {
         self.kind == other.kind
     }
 }
+
+impl From<&str> for Ident {
+    fn from(value: &str) -> Self {
+        Self {
+            name: Intern::from_ref(value),
+        }
+    }
+}
+
+impl From<PatternKind> for Pattern {
+    fn from(value: PatternKind) -> Self {
+        Self {
+            id: NodeId::next(),
+            kind: Intern::new(value),
+        }
+    }
+}

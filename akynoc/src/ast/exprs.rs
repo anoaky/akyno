@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::{
     ast::{
-        patterns::Ident,
+        patterns::{Ident, Pattern},
         types::{Ty, TyKind},
     },
     util::NodeId,
@@ -11,7 +11,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Hash)]
 pub enum Literal {
-    Int(i32),
+    Int(u32),
     Char(char),
     String(Intern<String>),
 }
@@ -44,6 +44,7 @@ pub enum Operator {
 pub enum ExprKind {
     Literal(Literal),
     Block(Vec<Expr>),
+    Pattern(Pattern),
     Fn(FnSig, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
     While(Box<Expr>, Box<Expr>),
@@ -67,5 +68,11 @@ impl From<ExprKind> for Expr {
             kind: value,
             ty: TyKind::Infer.into(),
         }
+    }
+}
+
+impl From<Literal> for Expr {
+    fn from(value: Literal) -> Self {
+        ExprKind::Literal(value).into()
     }
 }
