@@ -29,6 +29,17 @@ pub struct FnSig {
     ty: Ty,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum Operator {
+    Plus,
+    Minus,
+    Times,
+    Div,
+    Rem,
+    LogAnd,
+    LogOr,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub enum ExprKind {
     Literal(Literal),
@@ -37,6 +48,9 @@ pub enum ExprKind {
     If(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
     While(Box<Expr>, Box<Expr>),
     Call(Ident, Vec<Expr>),
+    Ref(Box<Expr>),
+    Deref(Box<Expr>),
+    BinOp(Box<Expr>, Operator, Box<Expr>),
 }
 
 #[derive(Debug, Clone, Serialize)]
